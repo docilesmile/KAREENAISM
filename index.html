@@ -6,7 +6,9 @@
 <title>KAREENAISM Task Spinner</title>
 <style>
     body { font-family: Arial, sans-serif; text-align: center; margin: 50px; background: #f5f5f5; }
-    #task { font-size: 1.2em; margin: 20px; min-height: 60px; }
+    #taskList { font-size: 1.1em; margin: 20px; text-align: left; display: inline-block; }
+    .taskItem { margin-bottom: 10px; }
+    .completed { text-decoration: line-through; color: #999; }
     button { padding: 10px 20px; font-size: 1em; margin: 5px; }
     .disabled { background: #ccc; color: #666; cursor: not-allowed; }
 </style>
@@ -39,20 +41,45 @@ async function loadTasks() {
 }
 
 function getRandomTask() {
-    if (tasks.length === 0) return "No tasks available.";
+    if (tasks.length === 0) {
+        document.getElementById('message').textContent = "No more tasks available.";
+        return;
+    }
+
     const index = Math.floor(Math.random() * tasks.length);
     const task = tasks[index];
-    completedTasks.push(task);
+    completedTasks.push({ text: task, done: false });
     tasks.splice(index, 1); // remove from available tasks
-    document.getElementById('task').textContent = task;
 
-    // Unlock release button after 5 tasks completed
-    if (completedTasks.length >= 5) {
-        document.getElementById('releaseBtn').disabled = false;
-        document.getElementById('releaseBtn').classList.remove('disabled');
-        document.getElementById('message').textContent = "You may now beg for release!";
-    }
+    // Create a new task element with checkbox
+    const taskDiv = document.createElement('div');
+    taskDiv.className = 'taskItem';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `task_${completedTasks.length - 1}`;
+
+    const label = document.createElement('label');
+    label.htmlFor = checkbox.id;
+    label.textContent = task;
+
+    // Checkbox listener: mark complete + style + check release
+    checkbox.addEventListener('change', function() {
+        if (this.checked) {
+            label.classList.add('completed'); // line-through + faded color
+            completedTasks[completedTasks.length - 1].done = true;
+        } else {
+            label.classList.remove('completed');
+            completedTasks[completedTasks.length - 1].done = false;
+        }
+        checkCompletion();
+    });
+
+    taskDiv.appendChild(checkbox);
+    taskDiv.appendChild(label);
+    document.getElementById('taskList').appendChild(taskDiv);
 }
+
 
 document.getElementById('nextTask').addEventListener('click', getRandomTask);
 document.getElementById('releaseBtn').addEventListener('click', () => {
@@ -64,5 +91,6 @@ loadTasks();
 
 </body>
 </html>
+
 
 
