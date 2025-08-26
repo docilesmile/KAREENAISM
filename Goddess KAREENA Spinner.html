@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KAREENAISM Task Spinner</title>
+<style>
+    body { font-family: Arial, sans-serif; text-align: center; margin: 50px; background: #f5f5f5; }
+    #task { font-size: 1.2em; margin: 20px; min-height: 60px; }
+    button { padding: 10px 20px; font-size: 1em; margin: 5px; }
+    .disabled { background: #ccc; color: #666; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<h1>KAREENAISM Task Spinner</h1>
+<div id="task">Loading tasks...</div>
+<button id="nextTask" class="disabled" disabled>Get Task</button>
+<button id="releaseBtn" class="disabled" disabled>Beg for Release</button>
+<p id="message"></p>
+
+<script>
+const jsonURL = "https://raw.githack.com/docilesmile/KAREENAISM/main/gistfile1.json"; // your GitHub Pages URL
+let tasks = [];
+let completedTasks = [];
+
+async function loadTasks() {
+    try {
+        const response = await fetch(jsonURL);
+        if (!response.ok) throw new Error("Network response was not ok");
+        tasks = await response.json();
+        document.getElementById('task').textContent = "Tasks loaded! Click 'Get Task' to start.";
+        document.getElementById('nextTask').disabled = false;
+        document.getElementById('nextTask').classList.remove('disabled');
+    } catch (error) {
+        document.getElementById('task').textContent = "Error loading tasks. Check your URL and console.";
+        console.error("Error fetching tasks:", error);
+    }
+}
+
+function getRandomTask() {
+    if (tasks.length === 0) return "No tasks available.";
+    const index = Math.floor(Math.random() * tasks.length);
+    const task = tasks[index];
+    completedTasks.push(task);
+    tasks.splice(index, 1); // remove from available tasks
+    document.getElementById('task').textContent = task;
+
+    // Unlock release button after 5 tasks completed
+    if (completedTasks.length >= 5) {
+        document.getElementById('releaseBtn').disabled = false;
+        document.getElementById('releaseBtn').classList.remove('disabled');
+        document.getElementById('message').textContent = "You may now beg for release!";
+    }
+}
+
+document.getElementById('nextTask').addEventListener('click', getRandomTask);
+document.getElementById('releaseBtn').addEventListener('click', () => {
+    alert("Begging for release! Remember, you can only release after completing the tasks.");
+});
+
+loadTasks();
+</script>
+
+</body>
+</html>
