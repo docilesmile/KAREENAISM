@@ -9,7 +9,7 @@
     #taskList { font-size: 1.1em; margin: 20px; text-align: left; display: inline-block; min-height: 60px; }
     .taskItem { margin-bottom: 10px; }
     .completed { text-decoration: line-through; color: #999; }
-    .highlight { background-color: #fff8b0; } /* optional highlight for most recent task */
+    .highlight { background-color: #fff8b0; padding: 3px; border-radius: 3px; } 
     button { padding: 10px 20px; font-size: 1em; margin: 5px; }
     .disabled { background: #ccc; color: #666; cursor: not-allowed; }
 </style>
@@ -17,13 +17,13 @@
 <body>
 
 <h1>KAREENAISM Task Spinner</h1>
-<div id="taskList">Loading tasks...</div>
+<p id="message">Loading tasks...</p>
+<div id="taskList"></div>
 <button id="nextTask" class="disabled" disabled>Get Task</button>
 <button id="releaseBtn" class="disabled" disabled>Beg for Release</button>
-<p id="message"></p>
 
 <script>
-const jsonURL = "gistfile1.json"; // Make sure this JSON file is in the same folder as your HTML
+const jsonURL = "gistfile1.json"; // Your JSON file in the same repo
 let tasks = [];
 let completedTasks = [];
 
@@ -33,11 +33,12 @@ async function loadTasks() {
         const response = await fetch(jsonURL);
         if (!response.ok) throw new Error("Network response was not ok");
         tasks = await response.json();
-        document.getElementById('taskList').textContent = "Tasks loaded! Click 'Get Task' to start.";
+        console.log("Loaded tasks:", tasks); // Debug: ensure tasks loaded
+        document.getElementById('message').textContent = "Tasks loaded! Click 'Get Task' to start.";
         document.getElementById('nextTask').disabled = false;
         document.getElementById('nextTask').classList.remove('disabled');
     } catch (error) {
-        document.getElementById('taskList').textContent = "Error loading tasks. Check your URL and console.";
+        document.getElementById('message').textContent = "Error loading tasks. Check your URL and console.";
         console.error("Error fetching tasks:", error);
     }
 }
