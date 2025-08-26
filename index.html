@@ -21,9 +21,11 @@
 <div id="taskList"></div>
 <button id="nextTask" class="disabled" disabled>Get Task</button>
 <button id="releaseBtn" class="disabled" disabled>Beg for Release</button>
+<button id="resetBtn">Reset Spinner</button>
 
 <script>
-const jsonURL = "gistfile1.json"; // Your JSON file in the same repo
+const jsonURL = "gistfile1.json"; // Your JSON file
+let allTasks = [];
 let tasks = [];
 let completedTasks = [];
 
@@ -32,18 +34,29 @@ async function loadTasks() {
     try {
         const response = await fetch(jsonURL);
         if (!response.ok) throw new Error("Network response was not ok");
-        tasks = await response.json();
-        console.log("Loaded tasks:", tasks); // Debug: ensure tasks loaded
+        allTasks = await response.json();
+        resetSpinner(); // Initialize with full list
+        console.log("Loaded tasks:", allTasks);
         document.getElementById('message').textContent = "Tasks loaded! Click 'Get Task' to start.";
-        document.getElementById('nextTask').disabled = false;
-        document.getElementById('nextTask').classList.remove('disabled');
     } catch (error) {
-        document.getElementById('message').textContent = "Error loading tasks. Check your URL and console.";
+        document.getElementById('message').textContent = "Error loading tasks. Check console.";
         console.error("Error fetching tasks:", error);
     }
 }
 
-// Check if all tasks are completed
+// Reset spinner to start fresh
+function resetSpinner() {
+    tasks = [...allTasks];
+    completedTasks = [];
+    document.getElementById('taskList').innerHTML = '';
+    document.getElementById('nextTask').disabled = false;
+    document.getElementById('nextTask').classList.remove('disabled');
+    document.getElementById('releaseBtn').disabled = true;
+    document.getElementById('releaseBtn').classList.add('disabled');
+    document.getElementById('message').textContent = "Spinner reset. Click 'Get Task'!";
+}
+
+// Check completion
 function checkCompletion() {
     const allChecked = completedTasks.every((_, i) => {
         const cb = document.getElementById(`task_${i}`);
@@ -70,12 +83,11 @@ function getRandomTask() {
     const index = Math.floor(Math.random() * tasks.length);
     const task = tasks[index];
     completedTasks.push({ text: task, done: false });
-    tasks.splice(index, 1); // remove from available tasks
+    tasks.splice(index, 1);
 
     // Remove previous highlight
     document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
 
-    // Create task element with checkbox
     const taskDiv = document.createElement('div');
     taskDiv.className = 'taskItem highlight';
 
@@ -87,7 +99,23 @@ function getRandomTask() {
     label.htmlFor = checkbox.id;
     label.textContent = task;
 
-    // Checkbox listener: strike-through + completion
+    // Re-spin button
+    const respinBtn = document.createElement('button');
+    respinBtn.textContent = "Re-spin";
+    respinBtn.addEventListener('click', () => {
+        // Only put back if pool isn't empty
+        if (tasks.length > 0) {
+            tasks.push(task); 
+            taskDiv.remove(); 
+            completedTasks.splice(completedTasks.findIndex(t => t.text === task), 1);
+            getRandomTask();
+            checkCompletion();
+        } else {
+            alert("No tasks left in pool to re-spin.");
+        }
+    });
+
+    // Checkbox listener
     checkbox.addEventListener('change', function() {
         if (this.checked) {
             label.classList.add('completed');
@@ -101,7 +129,21 @@ function getRandomTask() {
 
     taskDiv.appendChild(checkbox);
     taskDiv.appendChild(label);
+    taskDiv.appendChild(respinBtn);
     document.getElementById('taskList').appendChild(taskDiv);
+}
+
+// Auto-reset at 4 AM
+function scheduleDailyReset(hour = 4) {
+    const now = new Date();
+    const next = new Date();
+    next.setHours(hour, 0, 0, 0);
+    if (now > next) next.setDate(next.getDate() + 1); // tomorrow
+    const msUntilNext = next - now;
+    setTimeout(() => {
+        resetSpinner();
+        scheduleDailyReset(hour); // schedule next day
+    }, msUntilNext);
 }
 
 // Event listeners
@@ -109,9 +151,11 @@ document.getElementById('nextTask').addEventListener('click', getRandomTask);
 document.getElementById('releaseBtn').addEventListener('click', () => {
     alert("Begging for release! Only enabled after checking all tasks.");
 });
+document.getElementById('resetBtn').addEventListener('click', resetSpinner);
 
-// Load tasks on page load
+// Initialize
 loadTasks();
+scheduleDailyReset(4);
 </script>
 
 </body>
