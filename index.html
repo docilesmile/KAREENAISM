@@ -24,18 +24,21 @@
 <button id="resetBtn">Reset Spinner</button>
 
 <script>
-const jsonURL = "gistfile1.json"; // Your JSON file
+const taskJSON = "gistfile1.json"; // Your task JSON file
+const releaseJSON = "releaseOptions.json"; // Your release/denial JSON file
+
 let allTasks = [];
 let tasks = [];
 let completedTasks = [];
+let releaseOptions = [];
 
-// Load JSON tasks
+// Load tasks
 async function loadTasks() {
     try {
-        const response = await fetch(jsonURL);
+        const response = await fetch(taskJSON);
         if (!response.ok) throw new Error("Network response was not ok");
         allTasks = await response.json();
-        resetSpinner(); // Initialize with full list
+        resetSpinner();
         console.log("Loaded tasks:", allTasks);
         document.getElementById('message').textContent = "Tasks loaded! Click 'Get Task' to start.";
     } catch (error) {
@@ -44,7 +47,19 @@ async function loadTasks() {
     }
 }
 
-// Reset spinner to start fresh
+// Load release/denial options
+async function loadReleaseOptions() {
+    try {
+        const response = await fetch(releaseJSON);
+        if (!response.ok) throw new Error("Network response was not ok");
+        releaseOptions = await response.json();
+        console.log("Loaded release options:", releaseOptions);
+    } catch (error) {
+        console.error("Error fetching release options:", error);
+    }
+}
+
+// Reset spinner
 function resetSpinner() {
     tasks = [...allTasks];
     completedTasks = [];
@@ -85,7 +100,6 @@ function getRandomTask() {
     completedTasks.push({ text: task, done: false });
     tasks.splice(index, 1);
 
-    // Remove previous highlight
     document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
 
     const taskDiv = document.createElement('div');
@@ -99,11 +113,9 @@ function getRandomTask() {
     label.htmlFor = checkbox.id;
     label.textContent = task;
 
-    // Re-spin button
     const respinBtn = document.createElement('button');
     respinBtn.textContent = "Re-spin";
     respinBtn.addEventListener('click', () => {
-        // Only put back if pool isn't empty
         if (tasks.length > 0) {
             tasks.push(task); 
             taskDiv.remove(); 
@@ -115,7 +127,6 @@ function getRandomTask() {
         }
     });
 
-    // Checkbox listener
     checkbox.addEventListener('change', function() {
         if (this.checked) {
             label.classList.add('completed');
@@ -133,28 +144,37 @@ function getRandomTask() {
     document.getElementById('taskList').appendChild(taskDiv);
 }
 
+// Beg for release
+document.getElementById('releaseBtn').addEventListener('click', () => {
+    if (releaseOptions.length === 0) {
+        alert("No release options loaded.");
+        return;
+    }
+    const index = Math.floor(Math.random() * releaseOptions.length);
+    const command = releaseOptions[index];
+    alert(command); // Can later show in a div if preferred
+});
+
 // Auto-reset at 4 AM
 function scheduleDailyReset(hour = 4) {
     const now = new Date();
     const next = new Date();
     next.setHours(hour, 0, 0, 0);
-    if (now > next) next.setDate(next.getDate() + 1); // tomorrow
+    if (now > next) next.setDate(next.getDate() + 1);
     const msUntilNext = next - now;
     setTimeout(() => {
         resetSpinner();
-        scheduleDailyReset(hour); // schedule next day
+        scheduleDailyReset(hour);
     }, msUntilNext);
 }
 
 // Event listeners
 document.getElementById('nextTask').addEventListener('click', getRandomTask);
-document.getElementById('releaseBtn').addEventListener('click', () => {
-    alert("Begging for release! Only enabled after checking all tasks.");
-});
 document.getElementById('resetBtn').addEventListener('click', resetSpinner);
 
 // Initialize
 loadTasks();
+loadReleaseOptions();
 scheduleDailyReset(4);
 </script>
 
