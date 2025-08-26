@@ -9,6 +9,7 @@
     #taskList { font-size: 1.1em; margin: 20px; text-align: left; display: inline-block; min-height: 60px; }
     .taskItem { margin-bottom: 10px; }
     .completed { text-decoration: line-through; color: #999; }
+    .highlight { background-color: #fff8b0; } /* optional highlight for most recent task */
     button { padding: 10px 20px; font-size: 1em; margin: 5px; }
     .disabled { background: #ccc; color: #666; cursor: not-allowed; }
 </style>
@@ -22,7 +23,7 @@
 <p id="message"></p>
 
 <script>
-const jsonURL = "gistfile1.json"; // your GitHub Pages URL
+const jsonURL = "gistfile1.json"; // Make sure this JSON file is in the same folder as your HTML
 let tasks = [];
 let completedTasks = [];
 
@@ -70,9 +71,12 @@ function getRandomTask() {
     completedTasks.push({ text: task, done: false });
     tasks.splice(index, 1); // remove from available tasks
 
+    // Remove previous highlight
+    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+
     // Create task element with checkbox
     const taskDiv = document.createElement('div');
-    taskDiv.className = 'taskItem';
+    taskDiv.className = 'taskItem highlight';
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
