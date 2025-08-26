@@ -22,6 +22,7 @@
 <button id="nextTask" class="disabled" disabled>Get Task</button>
 <button id="releaseBtn" class="disabled" disabled>Beg for Release</button>
 <button id="resetBtn">Reset Spinner</button>
+<p id="countdown"></p>
 
 <script>
 const taskJSON = "gistfile1.json"; // Your task JSON file
@@ -69,6 +70,7 @@ function resetSpinner() {
     document.getElementById('releaseBtn').disabled = true;
     document.getElementById('releaseBtn').classList.add('disabled');
     document.getElementById('message').textContent = "Spinner reset. Click 'Get Task'!";
+    document.getElementById('countdown').textContent = "";
 }
 
 // Check completion
@@ -144,7 +146,7 @@ function getRandomTask() {
     document.getElementById('taskList').appendChild(taskDiv);
 }
 
-// Beg for release with random delay between 30s and 30min
+// Beg for release with random delay and countdown
 document.getElementById('releaseBtn').addEventListener('click', () => {
     if (releaseOptions.length === 0) {
         alert("No release options loaded.");
@@ -155,14 +157,25 @@ document.getElementById('releaseBtn').addEventListener('click', () => {
     const maxDelay = 30 * 60 * 1000; // 30 minutes
     const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
 
+    let remaining = delay;
     document.getElementById('message').textContent = "Goddess KAREENA is considering your request…";
 
-    setTimeout(() => {
-        const index = Math.floor(Math.random() * releaseOptions.length);
-        const command = releaseOptions[index];
-        alert(command);
-        document.getElementById('message').textContent = "Click 'Get Task' to continue.";
-    }, delay);
+    const countdownEl = document.getElementById('countdown');
+    const countdownInterval = setInterval(() => {
+        remaining -= 1000;
+        if (remaining <= 0) {
+            clearInterval(countdownInterval);
+            const index = Math.floor(Math.random() * releaseOptions.length);
+            const command = releaseOptions[index];
+            alert(command);
+            document.getElementById('message').textContent = "Click 'Get Task' to continue.";
+            countdownEl.textContent = "";
+        } else {
+            const minutes = Math.floor(remaining / 60000);
+            const seconds = Math.floor((remaining % 60000) / 1000);
+            countdownEl.textContent = `Time until Goddess decides: ${minutes}m ${seconds}s`;
+        }
+    }, 1000);
 });
 
 // Auto-reset at 4 AM
