@@ -144,15 +144,25 @@ function getRandomTask() {
     document.getElementById('taskList').appendChild(taskDiv);
 }
 
-// Beg for release
+// Beg for release with random delay between 30s and 30min
 document.getElementById('releaseBtn').addEventListener('click', () => {
     if (releaseOptions.length === 0) {
         alert("No release options loaded.");
         return;
     }
-    const index = Math.floor(Math.random() * releaseOptions.length);
-    const command = releaseOptions[index];
-    alert(command); // Can later show in a div if preferred
+
+    const minDelay = 30 * 1000; // 30 seconds
+    const maxDelay = 30 * 60 * 1000; // 30 minutes
+    const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+
+    document.getElementById('message').textContent = "Goddess KAREENA is considering your request…";
+
+    setTimeout(() => {
+        const index = Math.floor(Math.random() * releaseOptions.length);
+        const command = releaseOptions[index];
+        alert(command);
+        document.getElementById('message').textContent = "Click 'Get Task' to continue.";
+    }, delay);
 });
 
 // Auto-reset at 4 AM
