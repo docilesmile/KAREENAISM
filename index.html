@@ -1,286 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>KAREENAISM Task Spinner (Synced)</title>
-<style>
-  body { font-family: Arial, sans-serif; text-align: center; margin: 30px; background: #f5f5f5; }
-  h1 { margin-bottom: 8px; }
-  .card { background: white; padding: 16px; margin: 12px auto; max-width: 720px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-  label { margin-left: 6px; }
-  #taskList { font-size: 1.05em; margin: 12px auto; text-align: left; display: inline-block; min-height: 60px; width: 100%; max-width: 720px; }
-  .taskItem { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
-  .taskText { flex: 1; }
-  .completed { text-decoration: line-through; color: #999; }
-  .highlight { background-color: #fff8b0; padding: 4px 6px; border-radius: 4px; }
-  button { padding: 10px 16px; font-size: 1em; margin: 4px; border-radius: 8px; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.08); cursor: pointer; }
-  button.primary { background: #4f46e5; color: white; }
-  button.secondary { background: #e5e7eb; }
-  button.danger { background: #ef4444; color: white; }
-  button:disabled { background: #cfd2d8; color: #666; cursor: not-allowed; }
-  .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-  #message { margin: 12px 0; min-height: 24px; }
-  #auth, #app { max-width: 760px; margin: 0 auto; }
-  input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; max-width: 340px; }
-  .left { text-align: left; }
-  .muted { color: #666; font-size: 0.95em; }
-  #decisionArea { margin-top: 10px; }
-  #decisionStatus { margin-top: 8px; min-height: 24px; }
-</style>
+  <meta charset="UTF-8" />
+  <title>KAREENAISM Task Spinner</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 </head>
 <body>
+  <h1>Praise Goddess KAREENA!</h1>
 
-<h1>Praise Goddess KAREENA</h1>
-<p class="muted">Unified, synced devotion — across all your devices.</p>
+  <!-- Auth controls -->
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <button id="signup">Sign Up</button>
+  <button id="login">Login</button>
+  <button id="logout">Logout</button>
 
-<div id="auth" class="card">
-  <h2>Sign in / Sign up</h2>
-  <div class="row">
-    <input id="email" type="email" placeholder="Email" />
-    <input id="password" type="password" placeholder="Password" />
-  </div>
-  <div class="row">
-    <button id="signupBtn" class="secondary">Sign up</button>
-    <button id="signinBtn" class="primary">Sign in</button>
-  </div>
-  <p class="muted">Use the same account on phone & PC to sync tasks and decisions.</p>
-</div>
+  <hr>
 
-<div id="app" style="display:none;">
-  <div class="card left">
-    <div class="row" style="justify-content: space-between;">
-      <div><strong>Signed in as:</strong> <span id="whoami">—</span></div>
-      <div>
-        <button id="signoutBtn" class="secondary">Sign out</button>
-      </div>
-    </div>
-  </div>
+  <!-- Task button (starts disabled) -->
+  <button id="getTask" disabled>Get Task</button>
+  <p id="taskOutput"></p>
 
-  <div class="card">
-    <p id="message">Loading tasks…</p>
-    <div id="taskList"></div>
-    <div class="row">
-      <button id="nextTask" class="primary" disabled>Get Task</button>
-      <button id="resetBtn" class="danger">Reset Today</button>
-    </div>
-  </div>
+  <script>
+    // 🔥 Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+    };
 
-  <div class="card">
-    <h3>Judgment</h3>
-    <div id="decisionArea">
-      <button id="releaseBtn" class="primary" disabled>Beg for Release</button>
-      <div id="decisionStatus" class="muted"></div>
-    </div>
-  </div>
-</div>
+    // Init Firebase
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-document.addEventListener('DOMContentLoaded', async () => {
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const signupBtn = document.getElementById("signup");
+    const loginBtn = document.getElementById("login");
+    const logoutBtn = document.getElementById("logout");
+    const getTaskBtn = document.getElementById("getTask");
+    const taskOutput = document.getElementById("taskOutput");
 
-  const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";           
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Fake task list (replace with yours later)
+    const tasks = [
+      "Bow to Goddess KAREENA 10 times.",
+      "Repeat 'Om Namah KAREENA' 33 times.",
+      "Spend 5 minutes staring at Her Holy Feet.",
+    ];
 
-  let user = null;
-  let allTasks = [];
-  let rolledTasks = [];
-  let releaseOptions = [];
-  let countdownTimer = null;
-  let currentDecision = null;
-
-  const nextTask = document.getElementById('nextTask');
-  const resetBtn = document.getElementById('resetBtn');
-  const releaseBtn = document.getElementById('releaseBtn');
-  const signupBtn = document.getElementById('signupBtn');
-  const signinBtn = document.getElementById('signinBtn');
-  const signoutBtn = document.getElementById('signoutBtn');
-
-  const auth = document.getElementById('auth');
-  const app = document.getElementById('app');
-  const whoami = document.getElementById('whoami');
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-
-  function dayKey4am() {
-    const now = new Date();
-    if (now.getHours() < 4) now.setDate(now.getDate() - 1);
-    return now.toISOString().slice(0,10);
-  }
-  function setMessage(msg) { document.getElementById('message').textContent = msg; }
-  function setBeg(enabled) { releaseBtn.disabled = !enabled; }
-  function refreshBegEnabled() {
-    if (!rolledTasks.length) return setBeg(false);
-    setBeg(rolledTasks.every(t => t.done));
-  }
-
-  async function loadTasksFromDB() {
-    const { data, error } = await supabase.from('TaskLists').select('id,text');
-    if (error) throw error;
-    allTasks = data.map(r => r.text);
-  }
-  async function loadReleaseOptionsFromDB() {
-    const { data, error } = await supabase.from('releaseOptions').select('id,text');
-    if (error) throw error;
-    releaseOptions = data.map(r => r.text);
-  }
-
-  function renderTasks() {
-    const list = document.getElementById('taskList');
-    list.innerHTML = "";
-    rolledTasks.forEach((t) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'taskItem';
-
-      const left = document.createElement('div');
-      left.style.display = 'flex';
-      left.style.alignItems = 'center';
-      left.style.gap = '8px';
-
-      const cb = document.createElement('input');
-      cb.type = 'checkbox';
-      cb.checked = !!t.done;
-
-      const label = document.createElement('span');
-      label.className = 'taskText' + (t.done ? ' completed' : '');
-      label.textContent = t.text;
-
-      cb.addEventListener('change', () => {
-        t.done = cb.checked;
-        supabase.from('rolled_tasks').update({ done: t.done }).eq('id', t.id);
-        refreshBegEnabled();
-        label.classList.toggle('completed', cb.checked);
-      });
-
-      left.appendChild(cb);
-      left.appendChild(label);
-
-      const respinBtn = document.createElement('button');
-      respinBtn.textContent = 'Re-spin';
-      respinBtn.className = 'secondary';
-      respinBtn.addEventListener('click', async () => {
-        await supabase.from('rolled_tasks').delete().eq('id', t.id);
-        rolledTasks = rolledTasks.filter(x => x.id !== t.id);
-        renderTasks();
-        refreshBegEnabled();
-        getRandomTask();
-      });
-
-      wrap.appendChild(left);
-      wrap.appendChild(respinBtn);
-      list.appendChild(wrap);
+    // Signup
+    signupBtn.addEventListener("click", () => {
+      auth.createUserWithEmailAndPassword(emailInput.value, passwordInput.value)
+        .catch(err => alert(err.message));
     });
-  }
 
-  function availablePool() {
-    const used = new Set(rolledTasks.map(t => t.text));
-    return allTasks.filter(t => !used.has(t));
-  }
-  async function getRandomTask() {
-    const pool = availablePool();
-    if (!pool.length) return setMessage("No more tasks today.");
-    const pick = pool[Math.floor(Math.random() * pool.length)];
-    const { data, error } = await supabase
-      .from('rolled_tasks')
-      .insert({ user_id: user.id, text: pick, done: false, day_key: dayKey4am() })
-      .select().single();
-    if (!error) {
-      rolledTasks.push(data);
-      renderTasks();
-      refreshBegEnabled();
-    }
-  }
+    // Login
+    loginBtn.addEventListener("click", () => {
+      auth.signInWithEmailAndPassword(emailInput.value, passwordInput.value)
+        .catch(err => alert(err.message));
+    });
 
-  function msToDHMS(ms) {
-    const s = Math.max(0, Math.floor(ms/1000));
-    const h = Math.floor(s/3600);
-    const m = Math.floor((s%3600)/60);
-    const sec = s%60;
-    if (h) return `${h}h ${m}m ${sec}s`;
-    if (m) return `${m}m ${sec}s`;
-    return `${sec}s`;
-  }
-  function updateDecisionUI(state, remain, outcome) {
-    const status = document.getElementById('decisionStatus');
-    if (state === 'idle') { status.textContent = ""; }
-    if (state === 'pending') { status.textContent = `Goddess is deliberating… ${msToDHMS(remain)}`; }
-    if (state === 'revealed') { status.textContent = outcome; }
-  }
-  function startCountdown(revealAt, outcome) {
-    if (countdownTimer) clearInterval(countdownTimer);
-    countdownTimer = setInterval(async () => {
-      const remain = new Date(revealAt).getTime() - Date.now();
-      if (remain > 0) return updateDecisionUI('pending', remain);
-      clearInterval(countdownTimer);
-      await supabase.from('release_decisions').update({ status: 'revealed' }).eq('id', currentDecision.id);
-      updateDecisionUI('revealed', 0, outcome);
-    }, 1000);
-  }
-  async function begForRelease() {
-    const minMs = 30*1000, maxMs = 30*60*1000;
-    const delay = Math.floor(Math.random()*(maxMs-minMs))+minMs;
-    const outcome = releaseOptions[Math.floor(Math.random()*releaseOptions.length)];
-    const revealAt = new Date(Date.now()+delay).toISOString();
-    const { data } = await supabase.from('release_decisions').insert({
-      user_id: user.id, status:'pending', outcome, reveal_at:revealAt, day_key:dayKey4am()
-    }).select().single();
-    currentDecision = data;
-    startCountdown(currentDecision.reveal_at, currentDecision.outcome);
-  }
+    // Logout
+    logoutBtn.addEventListener("click", () => {
+      auth.signOut();
+    });
 
-  async function resetToday() {
-    await supabase.from('rolled_tasks').delete().eq('day_key', dayKey4am());
-    await supabase.from('release_decisions').delete().eq('day_key', dayKey4am());
-    rolledTasks=[]; currentDecision=null;
-    renderTasks(); updateDecisionUI('idle'); setMessage("Reset complete.");
-  }
+    // Auth state change
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        console.log("✅ Logged in:", user.email);
+        getTaskBtn.disabled = false;  // enable button
+      } else {
+        console.log("❌ Logged out");
+        getTaskBtn.disabled = true;   // disable button
+      }
+    });
 
-  async function handleSignup(){
-    const { error } = await supabase.auth.signUp({ email: emailInput.value, password: passwordInput.value });
-    if(error) alert(error.message);
-  }
-  async function handleSignin(){
-    const { error } = await supabase.auth.signInWithPassword({ email: emailInput.value, password: passwordInput.value });
-    if(error) alert(error.message);
-  }
-  async function handleSignout(){
-    await supabase.auth.signOut();
-  }
-
-  function showAppUI(show){ auth.style.display=show?'none':'block'; app.style.display=show?'block':'none'; }
-
-  async function initForUser() {
-    await loadTasksFromDB();
-    await loadReleaseOptionsFromDB();
-    const { data } = await supabase.from('rolled_tasks').select('*').eq('day_key',dayKey4am());
-    rolledTasks = data||[];
-    renderTasks();
-    refreshBegEnabled();
-    setMessage("Tasks ready.");
-
-    // Enable Get Task button now that user is fully initialized
-    nextTask.disabled = false;
-  }
-
-  nextTask.addEventListener('click', getRandomTask);
-  resetBtn.addEventListener('click', resetToday);
-  releaseBtn.addEventListener('click', begForRelease);
-  signupBtn.addEventListener('click', handleSignup);
-  signinBtn.addEventListener('click', handleSignin);
-  signoutBtn.addEventListener('click', handleSignout);
-
-  supabase.auth.onAuthStateChange(async(_,session)=>{
-    user=session?.user||null;
-    if(user){ whoami.textContent=user.email; showAppUI(true); initForUser();}
-    else{ showAppUI(false); whoami.textContent="—"; }
-  });
-
-  const { data } = await supabase.auth.getSession();
-  user = data.session?.user || null;
-  if(user){ whoami.textContent = user.email; showAppUI(true); initForUser(); }
-
-});
-</script>
+    // Get random task
+    getTaskBtn.addEventListener("click", () => {
+      const randomTask = tasks[Math.floor(Math.random() * tasks.length)];
+      taskOutput.innerText = randomTask;
+    });
+  </script>
 </body>
 </html>
