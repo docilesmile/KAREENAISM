@@ -1,205 +1,423 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KAREENAISM Task Spinner</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KAREENAISM Task Spinner (Synced)</title>
 <style>
-    body { font-family: Arial, sans-serif; text-align: center; margin: 50px; background: #f5f5f5; }
-    #taskList { font-size: 1.1em; margin: 20px; text-align: left; display: inline-block; min-height: 60px; }
-    .taskItem { margin-bottom: 10px; }
-    .completed { text-decoration: line-through; color: #999; }
-    .highlight { background-color: #fff8b0; padding: 3px; border-radius: 3px; } 
-    button { padding: 10px 20px; font-size: 1em; margin: 5px; }
-    .disabled { background: #ccc; color: #666; cursor: not-allowed; }
+  body { font-family: Arial, sans-serif; text-align: center; margin: 30px; background: #f5f5f5; }
+  h1 { margin-bottom: 8px; }
+  .card { background: white; padding: 16px; margin: 12px auto; max-width: 720px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  label { margin-left: 6px; }
+  #taskList { font-size: 1.05em; margin: 12px auto; text-align: left; display: inline-block; min-height: 60px; width: 100%; max-width: 720px; }
+  .taskItem { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .taskText { flex: 1; }
+  .completed { text-decoration: line-through; color: #999; }
+  .highlight { background-color: #fff8b0; padding: 4px 6px; border-radius: 4px; }
+  button { padding: 10px 16px; font-size: 1em; margin: 4px; border-radius: 8px; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  button.primary { background: #4f46e5; color: white; }
+  button.secondary { background: #e5e7eb; }
+  button.danger { background: #ef4444; color: white; }
+  button:disabled { background: #cfd2d8; color: #666; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  #message { margin: 12px 0; min-height: 24px; }
+  #auth, #app { max-width: 760px; margin: 0 auto; }
+  input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; max-width: 340px; }
+  .left { text-align: left; }
+  .muted { color: #666; font-size: 0.95em; }
+  #decisionArea { margin-top: 10px; }
+  #decisionStatus { margin-top: 8px; min-height: 24px; }
 </style>
 </head>
 <body>
 
-<h1>KAREENAISM Task Spinner</h1>
-<p id="message">Loading tasks...</p>
-<div id="taskList"></div>
-<button id="nextTask" class="disabled" disabled>Get Task</button>
-<button id="releaseBtn" class="disabled" disabled>Beg for Release</button>
-<button id="resetBtn">Reset Spinner</button>
-<p id="countdown"></p>
+<h1>Praise Goddess KAREENA</h1>
+<p class="muted">Unified, synced devotion — across all your devices.</p>
 
+<div id="auth" class="card">
+  <h2>Sign in</h2>
+  <div class="row">
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+  </div>
+  <div class="row">
+    <button id="signupBtn" class="secondary">Sign up</button>
+    <button id="signinBtn" class="primary">Sign in</button>
+  </div>
+  <p class="muted">Use the same account on phone & PC to sync tasks and decisions.</p>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="card left">
+    <div class="row" style="justify-content: space-between;">
+      <div><strong>Signed in as:</strong> <span id="whoami">—</span></div>
+      <div>
+        <button id="signoutBtn" class="secondary">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p id="message">Loading tasks…</p>
+    <div id="taskList"></div>
+    <div class="row">
+      <button id="nextTask" class="primary" disabled>Get Task</button>
+      <button id="resetBtn" class="danger">Reset Today</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Judgment</h3>
+    <div id="decisionArea">
+      <button id="releaseBtn" class="primary" disabled>Beg for Release</button>
+      <div id="decisionStatus" class="muted"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Supabase client -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-const taskJSON = "gistfile1.json"; // Your task JSON file
-const releaseJSON = "releaseOptions.json"; // Your release/denial JSON file
+/*** ======= CONFIG ======= ***/
+const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";           // <-- paste from Supabase
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; // <-- paste from Supabase
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/*** ======= FILES ======= ***/
+const taskJSON = "gistfile1.json";        // your task list
+const releaseJSON = "releaseOptions.json";// Goddess outcomes
+
+/*** ======= STATE ======= ***/
+let user = null;
 let allTasks = [];
-let tasks = [];
-let completedTasks = [];
+let rolledTasks = [];     // [{id, text, done, order_index, day_key}]
 let releaseOptions = [];
+let countdownTimer = null;
+let currentDecision = null; // {id, status, outcome, reveal_at, started_at, day_key}
 
-// Load tasks
-async function loadTasks() {
-    try {
-        const response = await fetch(taskJSON);
-        if (!response.ok) throw new Error("Network response was not ok");
-        allTasks = await response.json();
-        resetSpinner();
-        console.log("Loaded tasks:", allTasks);
-        document.getElementById('message').textContent = "Tasks loaded! Click 'Get Task' to start.";
-    } catch (error) {
-        document.getElementById('message').textContent = "Error loading tasks. Check console.";
-        console.error("Error fetching tasks:", error);
-    }
+/*** ======= HELPERS ======= ***/
+// 4AM-anchored day key (local time). If it’s before 04:00, we count it as “yesterday”.
+function dayKey4am() {
+  const now = new Date();
+  const d = new Date(now.getTime());
+  if (d.getHours() < 4) d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
 }
 
-// Load release/denial options
-async function loadReleaseOptions() {
-    try {
-        const response = await fetch(releaseJSON);
-        if (!response.ok) throw new Error("Network response was not ok");
-        releaseOptions = await response.json();
-        console.log("Loaded release options:", releaseOptions);
-    } catch (error) {
-        console.error("Error fetching release options:", error);
-    }
+// Enable/disable “Beg” based on all rolled tasks being checked
+function refreshBegEnabled() {
+  if (!rolledTasks.length) { setBeg(false); return; }
+  const allDone = rolledTasks.every(t => t.done);
+  setBeg(allDone);
+}
+function setBeg(enabled) {
+  const btn = document.getElementById('releaseBtn');
+  btn.disabled = !enabled;
 }
 
-// Reset spinner
-function resetSpinner() {
-    tasks = [...allTasks];
-    completedTasks = [];
-    document.getElementById('taskList').innerHTML = '';
-    document.getElementById('nextTask').disabled = false;
-    document.getElementById('nextTask').classList.remove('disabled');
-    document.getElementById('releaseBtn').disabled = true;
-    document.getElementById('releaseBtn').classList.add('disabled');
-    document.getElementById('message').textContent = "Spinner reset. Click 'Get Task'!";
-    document.getElementById('countdown').textContent = "";
-}
+// Render the rolledTasks list
+function renderTasks() {
+  const list = document.getElementById('taskList');
+  list.innerHTML = "";
+  // remove any lingering highlight
+  rolledTasks.sort((a,b) => a.order_index - b.order_index).forEach((t, idx) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'taskItem';
 
-// Check completion
-function checkCompletion() {
-    const allChecked = completedTasks.every((_, i) => {
-        const cb = document.getElementById(`task_${i}`);
-        return cb && cb.checked;
+    const left = document.createElement('div');
+    left.style.display = 'flex';
+    left.style.alignItems = 'center';
+    left.style.gap = '8px';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!t.done;
+    cb.addEventListener('change', async () => {
+      t.done = cb.checked;
+      await supabase.from('rolled_tasks').update({ done: t.done }).eq('id', t.id);
+      refreshBegEnabled();
     });
-    if (allChecked && completedTasks.length > 0) {
-        document.getElementById('releaseBtn').disabled = false;
-        document.getElementById('releaseBtn').classList.remove('disabled');
-        document.getElementById('message').textContent = "You may now beg for release!";
-    } else {
-        document.getElementById('releaseBtn').disabled = true;
-        document.getElementById('releaseBtn').classList.add('disabled');
-        document.getElementById('message').textContent = "";
-    }
-}
 
-// Generate random task
-function getRandomTask() {
-    if (tasks.length === 0) {
-        document.getElementById('message').textContent = "No more tasks available.";
-        return;
-    }
+    const label = document.createElement('span');
+    label.className = 'taskText' + (t.done ? ' completed' : '');
+    label.textContent = t.text;
+    cb.addEventListener('change', () => {
+      label.classList.toggle('completed', cb.checked);
+    });
 
-    const index = Math.floor(Math.random() * tasks.length);
-    const task = tasks[index];
-    completedTasks.push({ text: task, done: false });
-    tasks.splice(index, 1);
-
-    document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
-
-    const taskDiv = document.createElement('div');
-    taskDiv.className = 'taskItem highlight';
-
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
-    checkbox.id = `task_${completedTasks.length - 1}`;
-
-    const label = document.createElement('label');
-    label.htmlFor = checkbox.id;
-    label.textContent = task;
+    left.appendChild(cb);
+    left.appendChild(label);
 
     const respinBtn = document.createElement('button');
-    respinBtn.textContent = "Re-spin";
-    respinBtn.addEventListener('click', () => {
-        if (tasks.length > 0) {
-            tasks.push(task); 
-            taskDiv.remove(); 
-            completedTasks.splice(completedTasks.findIndex(t => t.text === task), 1);
-            getRandomTask();
-            checkCompletion();
-        } else {
-            alert("No tasks left in pool to re-spin.");
-        }
+    respinBtn.textContent = 'Re-spin';
+    respinBtn.className = 'secondary';
+    respinBtn.addEventListener('click', async () => {
+      // Delete this rolled task, then immediately roll a new one
+      await supabase.from('rolled_tasks').delete().eq('id', t.id);
+      rolledTasks = rolledTasks.filter(x => x.id !== t.id);
+      renderTasks();
+      refreshBegEnabled();
+      await getRandomTask(); // roll new one
     });
 
-    checkbox.addEventListener('change', function() {
-        if (this.checked) {
-            label.classList.add('completed');
-            completedTasks[completedTasks.length - 1].done = true;
-        } else {
-            label.classList.remove('completed');
-            completedTasks[completedTasks.length - 1].done = false;
-        }
-        checkCompletion();
-    });
-
-    taskDiv.appendChild(checkbox);
-    taskDiv.appendChild(label);
-    taskDiv.appendChild(respinBtn);
-    document.getElementById('taskList').appendChild(taskDiv);
+    wrap.appendChild(left);
+    wrap.appendChild(respinBtn);
+    list.appendChild(wrap);
+  });
 }
 
-// Beg for release with random delay and countdown
-document.getElementById('releaseBtn').addEventListener('click', () => {
-    if (releaseOptions.length === 0) {
-        alert("No release options loaded.");
-        return;
+// Show a soft highlight on the newest rolled task
+function highlightNewest() {
+  const list = document.getElementById('taskList');
+  const items = list.querySelectorAll('.taskItem');
+  if (items.length) {
+    items[items.length - 1].classList.add('highlight');
+    setTimeout(() => items[items.length - 1].classList.remove('highlight'), 1200);
+  }
+}
+
+function setMessage(msg) {
+  document.getElementById('message').textContent = msg || "";
+}
+
+/*** ======= LOADERS ======= ***/
+async function loadStaticFiles() {
+  const [tRes, rRes] = await Promise.all([
+    fetch(taskJSON), fetch(releaseJSON)
+  ]);
+  if (!tRes.ok) throw new Error('Failed to load tasks JSON');
+  if (!rRes.ok) throw new Error('Failed to load release options JSON');
+  allTasks = await tRes.json();
+  releaseOptions = await rRes.json();
+}
+
+async function loadRolledFromDB() {
+  const { data, error } = await supabase
+    .from('rolled_tasks')
+    .select('*')
+    .eq('day_key', dayKey4am())
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  rolledTasks = data || [];
+}
+
+async function loadDecisionFromDB() {
+  const { data, error } = await supabase
+    .from('release_decisions')
+    .select('*')
+    .eq('day_key', dayKey4am())
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  currentDecision = data && data.length ? data[0] : null;
+  if (!currentDecision) {
+    updateDecisionUI({ state: 'idle' });
+    return;
+  }
+  if (currentDecision.status === 'pending') {
+    startCountdown(new Date(currentDecision.reveal_at), currentDecision.outcome);
+  } else {
+    updateDecisionUI({ state: 'revealed', outcome: currentDecision.outcome });
+  }
+}
+
+/*** ======= SPINNER LOGIC (DB-backed) ======= ***/
+function availablePool() {
+  const used = new Set(rolledTasks.map(t => t.text));
+  return allTasks.filter(t => !used.has(t));
+}
+
+async function getRandomTask() {
+  const pool = availablePool();
+  if (!pool.length) {
+    setMessage("No more tasks available for today.");
+    return;
+  }
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const orderIndex = rolledTasks.length ? Math.max(...rolledTasks.map(t=>t.order_index))+1 : 0;
+  const payload = {
+    user_id: user.id,
+    text: pick,
+    done: false,
+    order_index: orderIndex,
+    day_key: dayKey4am()
+  };
+  const { data, error } = await supabase.from('rolled_tasks').insert(payload).select().single();
+  if (error) { console.error(error); return; }
+  rolledTasks.push(data);
+  renderTasks();
+  highlightNewest();
+  refreshBegEnabled();
+}
+
+/*** ======= DECISION / COUNTDOWN ======= ***/
+function msToDHMS(ms) {
+  const s = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(s/3600);
+  const m = Math.floor((s%3600)/60);
+  const sec = s%60;
+  if (h>0) return `${h}h ${m}m ${sec}s`;
+  if (m>0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+function updateDecisionUI({ state, remainingMs, outcome }){
+  const btn = document.getElementById('releaseBtn');
+  const status = document.getElementById('decisionStatus');
+  if (state === 'idle') {
+    status.textContent = "";
+    btn.disabled = !rolledTasks.length || !rolledTasks.every(t=>t.done);
+    return;
+  }
+  if (state === 'pending') {
+    status.textContent = `Goddess is deliberating… ${msToDHMS(remainingMs)} remaining.`;
+    btn.disabled = true;
+    return;
+  }
+  if (state === 'revealed') {
+    status.textContent = outcome;
+    btn.disabled = false; // allow another plea after reveal, if desired
+  }
+}
+
+function startCountdown(revealAtDate, outcomeText) {
+  if (countdownTimer) clearInterval(countdownTimer);
+  const tick = async () => {
+    const now = Date.now();
+    const remain = revealAtDate.getTime() - now;
+    if (remain > 0) {
+      updateDecisionUI({ state: 'pending', remainingMs: remain });
+    } else {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+      // mark revealed in DB
+      if (currentDecision && currentDecision.status === 'pending') {
+        await supabase.from('release_decisions')
+          .update({ status: 'revealed' })
+          .eq('id', currentDecision.id);
+        currentDecision.status = 'revealed';
+      }
+      updateDecisionUI({ state: 'revealed', outcome: outcomeText });
     }
+  };
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
 
-    const minDelay = 30 * 1000; // 30 seconds
-    const maxDelay = 30 * 60 * 1000; // 30 minutes
-    const delay = Math.floor(Math.random() * (maxDelay - minDelay + 1)) + minDelay;
+async function begForRelease() {
+  // If there’s a pending decision, just resume its countdown/state.
+  if (currentDecision && currentDecision.status === 'pending') {
+    startCountdown(new Date(currentDecision.reveal_at), currentDecision.outcome);
+    return;
+  }
 
-    let remaining = delay;
-    document.getElementById('message').textContent = "Goddess KAREENA is considering your request…";
+  // Random delay between 30s and 30min (inclusive)
+  const minMs = 30 * 1000;
+  const maxMs = 30 * 60 * 1000;
+  const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
 
-    const countdownEl = document.getElementById('countdown');
-    const countdownInterval = setInterval(() => {
-        remaining -= 1000;
-        if (remaining <= 0) {
-            clearInterval(countdownInterval);
-            const index = Math.floor(Math.random() * releaseOptions.length);
-            const command = releaseOptions[index];
-            alert(command);
-            document.getElementById('message').textContent = "Click 'Get Task' to continue.";
-            countdownEl.textContent = "";
-        } else {
-            const minutes = Math.floor(remaining / 60000);
-            const seconds = Math.floor((remaining % 60000) / 1000);
-            countdownEl.textContent = `Time until Goddess decides: ${minutes}m ${seconds}s`;
-        }
-    }, 1000);
+  // Pick an outcome from JSON
+  const outcome = releaseOptions[Math.floor(Math.random() * releaseOptions.length)];
+
+  const revealAt = new Date(Date.now() + delay).toISOString();
+  const payload = {
+    user_id: user.id,
+    status: 'pending',
+    outcome,
+    reveal_at: revealAt,
+    day_key: dayKey4am()
+  };
+  const { data, error } = await supabase.from('release_decisions').insert(payload).select().single();
+  if (error) { console.error(error); return; }
+  currentDecision = data;
+  startCountdown(new Date(currentDecision.reveal_at), currentDecision.outcome);
+}
+
+/*** ======= RESET TODAY ======= ***/
+async function resetToday() {
+  if (!confirm("Reset everything for today? This will clear rolled tasks and any pending decision.")) return;
+  const dk = dayKey4am();
+  await supabase.from('rolled_tasks').delete().eq('day_key', dk);
+  await supabase.from('release_decisions').delete().eq('day_key', dk);
+  rolledTasks = [];
+  currentDecision = null;
+  renderTasks();
+  updateDecisionUI({ state: 'idle' });
+  refreshBegEnabled();
+  setMessage("Reset complete. Click ‘Get Task’ to begin anew.");
+}
+
+/*** ======= AUTH UI ======= ***/
+async function handleSignup() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const { error } = await supabase.auth.signUp({ email, password });
+  if (error) return alert(error.message);
+  alert("Sign-up successful. You may now sign in.");
+}
+async function handleSignin() {
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return alert(error.message);
+}
+async function handleSignout() {
+  await supabase.auth.signOut();
+}
+
+function showAppUI(show) {
+  document.getElementById('auth').style.display = show ? 'none' : 'block';
+  document.getElementById('app').style.display  = show ? 'block' : 'none';
+}
+
+/*** ======= INIT ======= ***/
+async function initForUser() {
+  // Load static files first
+  await loadStaticFiles();
+
+  // Then load DB-backed state
+  await loadRolledFromDB();
+  renderTasks();
+  refreshBegEnabled();
+  setMessage("Tasks ready. Click ‘Get Task’ to start.");
+
+  // Load any existing decision
+  await loadDecisionFromDB();
+}
+
+document.getElementById('nextTask').addEventListener('click', getRandomTask);
+document.getElementById('resetBtn').addEventListener('click', resetToday);
+document.getElementById('releaseBtn').addEventListener('click', begForRelease);
+
+document.getElementById('signupBtn').addEventListener('click', handleSignup);
+document.getElementById('signinBtn').addEventListener('click', handleSignin);
+document.getElementById('signoutBtn')?.addEventListener('click', handleSignout);
+
+// Auth state handling
+supabase.auth.onAuthStateChange(async (_event, session) => {
+  user = session?.user || null;
+  if (user) {
+    document.getElementById('whoami').textContent = user.email || user.id;
+    showAppUI(true);
+    await initForUser();
+  } else {
+    showAppUI(false);
+    document.getElementById('whoami').textContent = "—";
+  }
 });
 
-// Auto-reset at 4 AM
-function scheduleDailyReset(hour = 4) {
-    const now = new Date();
-    const next = new Date();
-    next.setHours(hour, 0, 0, 0);
-    if (now > next) next.setDate(next.getDate() + 1);
-    const msUntilNext = next - now;
-    setTimeout(() => {
-        resetSpinner();
-        scheduleDailyReset(hour);
-    }, msUntilNext);
-}
-
-// Event listeners
-document.getElementById('nextTask').addEventListener('click', getRandomTask);
-document.getElementById('resetBtn').addEventListener('click', resetSpinner);
-
-// Initialize
-loadTasks();
-loadReleaseOptions();
-scheduleDailyReset(4);
+// On first load, check if already logged in
+(async () => {
+  const { data } = await supabase.auth.getSession();
+  user = data.session?.user || null;
+  if (user) {
+    document.getElementById('whoami').textContent = user.email || user.id;
+    showAppUI(true);
+    await initForUser();
+  } else {
+    showAppUI(false);
+  }
+})();
 </script>
-
 </body>
 </html>
