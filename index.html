@@ -79,48 +79,52 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /*** ======= CONFIG ======= ***/
-const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";           // <-- paste from Supabase
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; // <-- paste from Supabase
+const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";           
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-/*** ======= FILES ======= ***/
-const taskJSON = "gistfile1.json";        // your task list
-const releaseJSON = "releaseOptions.json";// Goddess outcomes
 
 /*** ======= STATE ======= ***/
 let user = null;
-let allTasks = [];
-let rolledTasks = [];     // [{id, text, done, order_index, day_key}]
-let releaseOptions = [];
+let allTasks = [];       // from TaskLists
+let rolledTasks = [];    // user’s rolls for today
+let releaseOptions = []; // from releaseOptions
 let countdownTimer = null;
-let currentDecision = null; // {id, status, outcome, reveal_at, started_at, day_key}
+let currentDecision = null;
 
 /*** ======= HELPERS ======= ***/
-// 4AM-anchored day key (local time). If it’s before 04:00, we count it as “yesterday”.
 function dayKey4am() {
   const now = new Date();
-  const d = new Date(now.getTime());
-  if (d.getHours() < 4) d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  if (now.getHours() < 4) now.setDate(now.getDate() - 1);
+  return now.toISOString().slice(0,10);
 }
-
-// Enable/disable “Beg” based on all rolled tasks being checked
-function refreshBegEnabled() {
-  if (!rolledTasks.length) { setBeg(false); return; }
-  const allDone = rolledTasks.every(t => t.done);
-  setBeg(allDone);
+function setMessage(msg) {
+  document.getElementById('message').textContent = msg;
 }
 function setBeg(enabled) {
-  const btn = document.getElementById('releaseBtn');
-  btn.disabled = !enabled;
+  document.getElementById('releaseBtn').disabled = !enabled;
+}
+function refreshBegEnabled() {
+  if (!rolledTasks.length) return setBeg(false);
+  setBeg(rolledTasks.every(t => t.done));
 }
 
-// Render the rolledTasks list
+/*** ======= LOAD FROM SUPABASE ======= ***/
+async function loadTasksFromDB() {
+  const { data, error } = await supabase.from('TaskLists').select('id,text');
+  if (error) throw error;
+  allTasks = data.map(r => r.text);
+}
+async function loadReleaseOptionsFromDB() {
+  const { data, error } = await supabase.from('releaseOptions').select('id,text');
+  if (error) throw error;
+  releaseOptions = data.map(r => r.text);
+}
+
+/*** ======= UI RENDER ======= ***/
 function renderTasks() {
   const list = document.getElementById('taskList');
   list.innerHTML = "";
-  // remove any lingering highlight
-  rolledTasks.sort((a,b) => a.order_index - b.order_index).forEach((t, idx) => {
+  rolledTasks.forEach((t, idx) => {
     const wrap = document.createElement('div');
     wrap.className = 'taskItem';
 
@@ -132,18 +136,16 @@ function renderTasks() {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = !!t.done;
-    cb.addEventListener('change', async () => {
+    cb.addEventListener('change', () => {
       t.done = cb.checked;
-      await supabase.from('rolled_tasks').update({ done: t.done }).eq('id', t.id);
+      supabase.from('rolled_tasks').update({ done: t.done }).eq('id', t.id);
       refreshBegEnabled();
+      label.classList.toggle('completed', cb.checked);
     });
 
     const label = document.createElement('span');
     label.className = 'taskText' + (t.done ? ' completed' : '');
     label.textContent = t.text;
-    cb.addEventListener('change', () => {
-      label.classList.toggle('completed', cb.checked);
-    });
 
     left.appendChild(cb);
     left.appendChild(label);
@@ -152,12 +154,11 @@ function renderTasks() {
     respinBtn.textContent = 'Re-spin';
     respinBtn.className = 'secondary';
     respinBtn.addEventListener('click', async () => {
-      // Delete this rolled task, then immediately roll a new one
       await supabase.from('rolled_tasks').delete().eq('id', t.id);
       rolledTasks = rolledTasks.filter(x => x.id !== t.id);
       renderTasks();
       refreshBegEnabled();
-      await getRandomTask(); // roll new one
+      getRandomTask();
     });
 
     wrap.appendChild(left);
@@ -166,258 +167,101 @@ function renderTasks() {
   });
 }
 
-// Show a soft highlight on the newest rolled task
-function highlightNewest() {
-  const list = document.getElementById('taskList');
-  const items = list.querySelectorAll('.taskItem');
-  if (items.length) {
-    items[items.length - 1].classList.add('highlight');
-    setTimeout(() => items[items.length - 1].classList.remove('highlight'), 1200);
-  }
-}
-
-function setMessage(msg) {
-  document.getElementById('message').textContent = msg || "";
-}
-
-/*** ======= LOADERS ======= ***/
-async function loadStaticFiles() {
-  const [tRes, rRes] = await Promise.all([
-    fetch(taskJSON), fetch(releaseJSON)
-  ]);
-  if (!tRes.ok) throw new Error('Failed to load tasks JSON');
-  if (!rRes.ok) throw new Error('Failed to load release options JSON');
-  allTasks = await tRes.json();
-  releaseOptions = await rRes.json();
-}
-
-async function loadRolledFromDB() {
-  const { data, error } = await supabase
-    .from('rolled_tasks')
-    .select('*')
-    .eq('day_key', dayKey4am())
-    .order('created_at', { ascending: true });
-  if (error) throw error;
-  rolledTasks = data || [];
-}
-
-async function loadDecisionFromDB() {
-  const { data, error } = await supabase
-    .from('release_decisions')
-    .select('*')
-    .eq('day_key', dayKey4am())
-    .order('created_at', { ascending: false })
-    .limit(1);
-  if (error) throw error;
-  currentDecision = data && data.length ? data[0] : null;
-  if (!currentDecision) {
-    updateDecisionUI({ state: 'idle' });
-    return;
-  }
-  if (currentDecision.status === 'pending') {
-    startCountdown(new Date(currentDecision.reveal_at), currentDecision.outcome);
-  } else {
-    updateDecisionUI({ state: 'revealed', outcome: currentDecision.outcome });
-  }
-}
-
-/*** ======= SPINNER LOGIC (DB-backed) ======= ***/
+/*** ======= TASK LOGIC ======= ***/
 function availablePool() {
   const used = new Set(rolledTasks.map(t => t.text));
   return allTasks.filter(t => !used.has(t));
 }
-
 async function getRandomTask() {
   const pool = availablePool();
-  if (!pool.length) {
-    setMessage("No more tasks available for today.");
-    return;
-  }
+  if (!pool.length) return setMessage("No more tasks today.");
   const pick = pool[Math.floor(Math.random() * pool.length)];
-  const orderIndex = rolledTasks.length ? Math.max(...rolledTasks.map(t=>t.order_index))+1 : 0;
-  const payload = {
-    user_id: user.id,
-    text: pick,
-    done: false,
-    order_index: orderIndex,
-    day_key: dayKey4am()
-  };
-  const { data, error } = await supabase.from('rolled_tasks').insert(payload).select().single();
-  if (error) { console.error(error); return; }
-  rolledTasks.push(data);
-  renderTasks();
-  highlightNewest();
-  refreshBegEnabled();
+  const { data, error } = await supabase
+    .from('rolled_tasks')
+    .insert({ user_id: user.id, text: pick, done: false, day_key: dayKey4am() })
+    .select().single();
+  if (!error) {
+    rolledTasks.push(data);
+    renderTasks();
+    refreshBegEnabled();
+  }
 }
 
-/*** ======= DECISION / COUNTDOWN ======= ***/
+/*** ======= DECISION ======= ***/
 function msToDHMS(ms) {
   const s = Math.max(0, Math.floor(ms/1000));
   const h = Math.floor(s/3600);
   const m = Math.floor((s%3600)/60);
   const sec = s%60;
-  if (h>0) return `${h}h ${m}m ${sec}s`;
-  if (m>0) return `${m}m ${sec}s`;
+  if (h) return `${h}h ${m}m ${sec}s`;
+  if (m) return `${m}m ${sec}s`;
   return `${sec}s`;
 }
-
-function updateDecisionUI({ state, remainingMs, outcome }){
-  const btn = document.getElementById('releaseBtn');
+function updateDecisionUI(state, remain, outcome) {
   const status = document.getElementById('decisionStatus');
-  if (state === 'idle') {
-    status.textContent = "";
-    btn.disabled = !rolledTasks.length || !rolledTasks.every(t=>t.done);
-    return;
-  }
-  if (state === 'pending') {
-    status.textContent = `Goddess is deliberating… ${msToDHMS(remainingMs)} remaining.`;
-    btn.disabled = true;
-    return;
-  }
-  if (state === 'revealed') {
-    status.textContent = outcome;
-    btn.disabled = false; // allow another plea after reveal, if desired
-  }
+  if (state === 'idle') { status.textContent = ""; }
+  if (state === 'pending') { status.textContent = `Goddess is deliberating… ${msToDHMS(remain)}`; }
+  if (state === 'revealed') { status.textContent = outcome; }
 }
-
-function startCountdown(revealAtDate, outcomeText) {
+function startCountdown(revealAt, outcome) {
   if (countdownTimer) clearInterval(countdownTimer);
-  const tick = async () => {
-    const now = Date.now();
-    const remain = revealAtDate.getTime() - now;
-    if (remain > 0) {
-      updateDecisionUI({ state: 'pending', remainingMs: remain });
-    } else {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-      // mark revealed in DB
-      if (currentDecision && currentDecision.status === 'pending') {
-        await supabase.from('release_decisions')
-          .update({ status: 'revealed' })
-          .eq('id', currentDecision.id);
-        currentDecision.status = 'revealed';
-      }
-      updateDecisionUI({ state: 'revealed', outcome: outcomeText });
-    }
-  };
-  tick();
-  countdownTimer = setInterval(tick, 1000);
+  countdownTimer = setInterval(async () => {
+    const remain = new Date(revealAt).getTime() - Date.now();
+    if (remain > 0) return updateDecisionUI('pending', remain);
+    clearInterval(countdownTimer);
+    await supabase.from('release_decisions').update({ status: 'revealed' }).eq('id', currentDecision.id);
+    updateDecisionUI('revealed', 0, outcome);
+  }, 1000);
 }
-
 async function begForRelease() {
-  // If there’s a pending decision, just resume its countdown/state.
-  if (currentDecision && currentDecision.status === 'pending') {
-    startCountdown(new Date(currentDecision.reveal_at), currentDecision.outcome);
-    return;
-  }
-
-  // Random delay between 30s and 30min (inclusive)
-  const minMs = 30 * 1000;
-  const maxMs = 30 * 60 * 1000;
-  const delay = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-
-  // Pick an outcome from JSON
-  const outcome = releaseOptions[Math.floor(Math.random() * releaseOptions.length)];
-
-  const revealAt = new Date(Date.now() + delay).toISOString();
-  const payload = {
-    user_id: user.id,
-    status: 'pending',
-    outcome,
-    reveal_at: revealAt,
-    day_key: dayKey4am()
-  };
-  const { data, error } = await supabase.from('release_decisions').insert(payload).select().single();
-  if (error) { console.error(error); return; }
+  const minMs = 30*1000, maxMs = 30*60*1000;
+  const delay = Math.floor(Math.random()*(maxMs-minMs))+minMs;
+  const outcome = releaseOptions[Math.floor(Math.random()*releaseOptions.length)];
+  const revealAt = new Date(Date.now()+delay).toISOString();
+  const { data } = await supabase.from('release_decisions').insert({
+    user_id: user.id, status:'pending', outcome, reveal_at:revealAt, day_key:dayKey4am()
+  }).select().single();
   currentDecision = data;
-  startCountdown(new Date(currentDecision.reveal_at), currentDecision.outcome);
+  startCountdown(currentDecision.reveal_at, currentDecision.outcome);
 }
 
-/*** ======= RESET TODAY ======= ***/
+/*** ======= RESET ======= ***/
 async function resetToday() {
-  if (!confirm("Reset everything for today? This will clear rolled tasks and any pending decision.")) return;
-  const dk = dayKey4am();
-  await supabase.from('rolled_tasks').delete().eq('day_key', dk);
-  await supabase.from('release_decisions').delete().eq('day_key', dk);
-  rolledTasks = [];
-  currentDecision = null;
-  renderTasks();
-  updateDecisionUI({ state: 'idle' });
-  refreshBegEnabled();
-  setMessage("Reset complete. Click ‘Get Task’ to begin anew.");
+  await supabase.from('rolled_tasks').delete().eq('day_key', dayKey4am());
+  await supabase.from('release_decisions').delete().eq('day_key', dayKey4am());
+  rolledTasks=[]; currentDecision=null;
+  renderTasks(); updateDecisionUI('idle'); setMessage("Reset complete.");
 }
 
-/*** ======= AUTH UI ======= ***/
-async function handleSignup() {
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  const { error } = await supabase.auth.signUp({ email, password });
-  if (error) return alert(error.message);
-  alert("Sign-up successful. You may now sign in.");
-}
-async function handleSignin() {
-  const email = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return alert(error.message);
-}
-async function handleSignout() {
-  await supabase.auth.signOut();
-}
+/*** ======= AUTH ======= ***/
+async function handleSignup(){ const { error }=await supabase.auth.signUp({ email:email.value, password:password.value }); if(error)alert(error.message);}
+async function handleSignin(){ const { error }=await supabase.auth.signInWithPassword({ email:email.value, password:password.value }); if(error)alert(error.message);}
+async function handleSignout(){ await supabase.auth.signOut(); }
 
-function showAppUI(show) {
-  document.getElementById('auth').style.display = show ? 'none' : 'block';
-  document.getElementById('app').style.display  = show ? 'block' : 'none';
-}
+function showAppUI(show){ auth.style.display=show?'none':'block'; app.style.display=show?'block':'none'; }
 
 /*** ======= INIT ======= ***/
 async function initForUser() {
-  // Load static files first
-  await loadStaticFiles();
-
-  // Then load DB-backed state
-  await loadRolledFromDB();
-  renderTasks();
-  refreshBegEnabled();
-  setMessage("Tasks ready. Click ‘Get Task’ to start.");
-
-  // Load any existing decision
-  await loadDecisionFromDB();
+  await loadTasksFromDB();
+  await loadReleaseOptionsFromDB();
+  const { data } = await supabase.from('rolled_tasks').select('*').eq('day_key',dayKey4am());
+  rolledTasks = data||[];
+  renderTasks(); refreshBegEnabled(); setMessage("Tasks ready.");
 }
 
-document.getElementById('nextTask').addEventListener('click', getRandomTask);
-document.getElementById('resetBtn').addEventListener('click', resetToday);
-document.getElementById('releaseBtn').addEventListener('click', begForRelease);
+nextTask.addEventListener('click',getRandomTask);
+resetBtn.addEventListener('click',resetToday);
+releaseBtn.addEventListener('click',begForRelease);
+signupBtn.addEventListener('click',handleSignup);
+signinBtn.addEventListener('click',handleSignin);
+signoutBtn.addEventListener('click',handleSignout);
 
-document.getElementById('signupBtn').addEventListener('click', handleSignup);
-document.getElementById('signinBtn').addEventListener('click', handleSignin);
-document.getElementById('signoutBtn')?.addEventListener('click', handleSignout);
-
-// Auth state handling
-supabase.auth.onAuthStateChange(async (_event, session) => {
-  user = session?.user || null;
-  if (user) {
-    document.getElementById('whoami').textContent = user.email || user.id;
-    showAppUI(true);
-    await initForUser();
-  } else {
-    showAppUI(false);
-    document.getElementById('whoami').textContent = "—";
-  }
+supabase.auth.onAuthStateChange(async(_,session)=>{
+  user=session?.user||null;
+  if(user){ whoami.textContent=user.email; showAppUI(true); initForUser();}
+  else{ showAppUI(false); whoami.textContent="—"; }
 });
-
-// On first load, check if already logged in
-(async () => {
-  const { data } = await supabase.auth.getSession();
-  user = data.session?.user || null;
-  if (user) {
-    document.getElementById('whoami').textContent = user.email || user.id;
-    showAppUI(true);
-    await initForUser();
-  } else {
-    showAppUI(false);
-  }
-})();
+(async()=>{ const { data }=await supabase.auth.getSession(); user=data.session?.user||null; if(user){ whoami.textContent=user.email; showAppUI(true); initForUser(); } })();
 </script>
 </body>
 </html>
