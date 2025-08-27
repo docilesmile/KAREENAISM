@@ -14,7 +14,7 @@
   .taskText { flex: 1; }
   .completed { text-decoration: line-through; color: #999; }
   .highlight { background-color: #fff8b0; padding: 4px 6px; border-radius: 4px; }
-  button { padding: 10px 16px; font-size: 1em; margin: 4px; border-radius: 8px; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  button { padding: 10px 16px; font-size: 1em; margin: 4px; border-radius: 8px; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.08); cursor: pointer; }
   button.primary { background: #4f46e5; color: white; }
   button.secondary { background: #e5e7eb; }
   button.danger { background: #ef4444; color: white; }
@@ -35,7 +35,7 @@
 <p class="muted">Unified, synced devotion — across all your devices.</p>
 
 <div id="auth" class="card">
-  <h2>Sign in</h2>
+  <h2>Sign in / Sign up</h2>
   <div class="row">
     <input id="email" type="email" placeholder="Email" />
     <input id="password" type="password" placeholder="Password" />
@@ -104,6 +104,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const auth = document.getElementById('auth');
   const app = document.getElementById('app');
   const whoami = document.getElementById('whoami');
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
 
   /*** ======= HELPERS ======= ***/
   function dayKey4am() {
@@ -111,12 +113,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (now.getHours() < 4) now.setDate(now.getDate() - 1);
     return now.toISOString().slice(0,10);
   }
-  function setMessage(msg) {
-    document.getElementById('message').textContent = msg;
-  }
-  function setBeg(enabled) {
-    releaseBtn.disabled = !enabled;
-  }
+  function setMessage(msg) { document.getElementById('message').textContent = msg; }
+  function setBeg(enabled) { releaseBtn.disabled = !enabled; }
   function refreshBegEnabled() {
     if (!rolledTasks.length) return setBeg(false);
     setBeg(rolledTasks.every(t => t.done));
@@ -249,9 +247,33 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   /*** ======= AUTH ======= ***/
-  async function handleSignup(){ const { error }=await supabase.auth.signUp({ email:email.value, password:password.value }); if(error)alert(error.message);}
-  async function handleSignin(){ const { error }=await supabase.auth.signInWithPassword({ email:email.value, password:password.value }); if(error)alert(error.message);}
-  async function handleSignout(){ await supabase.auth.signOut(); }
+  async function handleSignup() {
+    const { data, error } = await supabase.auth.signUp({
+      email: emailInput.value,
+      password: passwordInput.value
+    });
+    if (error) return alert(error.message);
+    alert("Check your email to confirm sign-up. Once confirmed, you can sign in.");
+  }
+
+  async function handleSignin() {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: emailInput.value,
+      password: passwordInput.value
+    });
+    if (error) return alert(error.message);
+    user = data.user;
+    whoami.textContent = user.email;
+    showAppUI(true);
+    await initForUser();
+  }
+
+  async function handleSignout() {
+    await supabase.auth.signOut();
+    user = null;
+    showAppUI(false);
+    whoami.textContent = "—";
+  }
 
   /*** ======= SHOW/HIDE APP ======= ***/
   function showAppUI(show){ auth.style.display=show?'none':'block'; app.style.display=show?'block':'none'; }
