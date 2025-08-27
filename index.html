@@ -1,3 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KAREENAISM Task Spinner (Synced)</title>
+<style>
+  body { font-family: Arial, sans-serif; text-align: center; margin: 30px; background: #f5f5f5; }
+  h1 { margin-bottom: 8px; }
+  .card { background: white; padding: 16px; margin: 12px auto; max-width: 720px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  label { margin-left: 6px; }
+  #taskList { font-size: 1.05em; margin: 12px auto; text-align: left; display: inline-block; min-height: 60px; width: 100%; max-width: 720px; }
+  .taskItem { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+  .taskText { flex: 1; }
+  .completed { text-decoration: line-through; color: #999; }
+  .highlight { background-color: #fff8b0; padding: 4px 6px; border-radius: 4px; }
+  button { padding: 10px 16px; font-size: 1em; margin: 4px; border-radius: 8px; border: none; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+  button.primary { background: #4f46e5; color: white; }
+  button.secondary { background: #e5e7eb; }
+  button.danger { background: #ef4444; color: white; }
+  button:disabled { background: #cfd2d8; color: #666; cursor: not-allowed; }
+  .row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  #message { margin: 12px 0; min-height: 24px; }
+  #auth, #app { max-width: 760px; margin: 0 auto; }
+  input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; max-width: 340px; }
+  .left { text-align: left; }
+  .muted { color: #666; font-size: 0.95em; }
+  #decisionArea { margin-top: 10px; }
+  #decisionStatus { margin-top: 8px; min-height: 24px; }
+</style>
+</head>
+<body>
+
+<h1>Praise Goddess KAREENA</h1>
+<p class="muted">Unified, synced devotion — across all your devices.</p>
+
+<div id="auth" class="card">
+  <h2>Sign in</h2>
+  <div class="row">
+    <input id="email" type="email" placeholder="Email" />
+    <input id="password" type="password" placeholder="Password" />
+  </div>
+  <div class="row">
+    <button id="signupBtn" class="secondary">Sign up</button>
+    <button id="signinBtn" class="primary">Sign in</button>
+  </div>
+  <p class="muted">Use the same account on phone & PC to sync tasks and decisions.</p>
+</div>
+
+<div id="app" style="display:none;">
+  <div class="card left">
+    <div class="row" style="justify-content: space-between;">
+      <div><strong>Signed in as:</strong> <span id="whoami">—</span></div>
+      <div>
+        <button id="signoutBtn" class="secondary">Sign out</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p id="message">Loading tasks…</p>
+    <div id="taskList"></div>
+    <div class="row">
+      <button id="nextTask" class="primary" disabled>Get Task</button>
+      <button id="resetBtn" class="danger">Reset Today</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Judgment</h3>
+    <div id="decisionArea">
+      <button id="releaseBtn" class="primary" disabled>Beg for Release</button>
+      <div id="decisionStatus" class="muted"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Supabase client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -8,9 +85,9 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 /*** ======= STATE ======= ***/
 let user = null;
-let allTasks = [];       // from TaskLists
-let rolledTasks = [];    // user’s rolls for today
-let releaseOptions = []; // from releaseOptions
+let allTasks = [];
+let rolledTasks = [];
+let releaseOptions = [];
 let countdownTimer = null;
 let currentDecision = null;
 
@@ -47,7 +124,7 @@ async function loadReleaseOptionsFromDB() {
 function renderTasks() {
   const list = document.getElementById('taskList');
   list.innerHTML = "";
-  rolledTasks.forEach((t, idx) => {
+  rolledTasks.forEach((t) => {
     const wrap = document.createElement('div');
     wrap.className = 'taskItem';
 
@@ -59,16 +136,16 @@ function renderTasks() {
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = !!t.done;
+    const label = document.createElement('span');
+    label.className = 'taskText' + (t.done ? ' completed' : '');
+    label.textContent = t.text;
+
     cb.addEventListener('change', () => {
       t.done = cb.checked;
       supabase.from('rolled_tasks').update({ done: t.done }).eq('id', t.id);
       refreshBegEnabled();
       label.classList.toggle('completed', cb.checked);
     });
-
-    const label = document.createElement('span');
-    label.className = 'taskText' + (t.done ? ' completed' : '');
-    label.textContent = t.text;
 
     left.appendChild(cb);
     left.appendChild(label);
@@ -157,13 +234,21 @@ async function resetToday() {
 }
 
 /*** ======= AUTH ======= ***/
-async function handleSignup(){ const { error }=await supabase.auth.signUp({ email:email.value, password:password.value }); if(error)alert(error.message); }
-async function handleSignin(){ const { error }=await supabase.auth.signInWithPassword({ email:email.value, password:password.value }); if(error)alert(error.message); }
+async function handleSignup(){ const { error }=await supabase.auth.signUp({ email:email.value, password:password.value }); if(error)alert(error.message);}
+async function handleSignin(){ const { error }=await supabase.auth.signInWithPassword({ email:email.value, password:password.value }); if(error)alert(error.message);}
 async function handleSignout(){ await supabase.auth.signOut(); }
 
-function showAppUI(show){ auth.style.display=show?'none':'block'; app.style.display=show?'block':'none'; }
+/*** ======= BUTTON REFERENCES ======= ***/
+const nextTask = document.getElementById('nextTask');
+const resetBtn = document.getElementById('resetBtn');
+const releaseBtn = document.getElementById('releaseBtn');
+const signupBtn = document.getElementById('signupBtn');
+const signinBtn = document.getElementById('signinBtn');
+const signoutBtn = document.getElementById('signoutBtn');
 
 /*** ======= INIT ======= ***/
+function showAppUI(show){ auth.style.display=show?'none':'block'; app.style.display=show?'block':'none'; }
+
 async function initForUser() {
   await loadTasksFromDB();
   await loadReleaseOptionsFromDB();
@@ -172,28 +257,26 @@ async function initForUser() {
   renderTasks(); refreshBegEnabled(); setMessage("Tasks ready.");
 }
 
-nextTask.addEventListener('click',getRandomTask);
-resetBtn.addEventListener('click',resetToday);
-releaseBtn.addEventListener('click',begForRelease);
-signupBtn.addEventListener('click',handleSignup);
-signinBtn.addEventListener('click',handleSignin);
-signoutBtn.addEventListener('click',handleSignout);
+/*** ======= ATTACH EVENT LISTENERS ======= ***/
+nextTask.addEventListener('click', getRandomTask);
+resetBtn.addEventListener('click', resetToday);
+releaseBtn.addEventListener('click', begForRelease);
+signupBtn.addEventListener('click', handleSignup);
+signinBtn.addEventListener('click', handleSignin);
+signoutBtn.addEventListener('click', handleSignout);
 
-// Listen to auth state changes
+/*** ======= AUTH STATE ======= ***/
 supabase.auth.onAuthStateChange(async(_,session)=>{
   user=session?.user||null;
   if(user){ whoami.textContent=user.email; showAppUI(true); initForUser();}
   else{ showAppUI(false); whoami.textContent="—"; }
 });
 
-// Only check for a real session, do NOT attempt anonymous sign-in
 (async()=>{
-  const { data } = await supabase.auth.getSession();
-  if(data.session && data.session.user){
-    user = data.session.user;
-    whoami.textContent = user.email;
-    showAppUI(true);
-    initForUser();
-  }
+  const { data }=await supabase.auth.getSession();
+  user=data.session?.user||null;
+  if(user){ whoami.textContent=user.email; showAppUI(true); initForUser(); }
 })();
 </script>
+</body>
+</html>
