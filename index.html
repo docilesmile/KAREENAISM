@@ -75,17 +75,14 @@
   </div>
 </div>
 
-<!-- Supabase client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
 
-  /*** ======= CONFIG ======= ***/
   const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";           
   const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  /*** ======= STATE ======= ***/
   let user = null;
   let allTasks = [];
   let rolledTasks = [];
@@ -93,7 +90,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   let countdownTimer = null;
   let currentDecision = null;
 
-  /*** ======= BUTTON REFERENCES ======= ***/
   const nextTask = document.getElementById('nextTask');
   const resetBtn = document.getElementById('resetBtn');
   const releaseBtn = document.getElementById('releaseBtn');
@@ -107,7 +103,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const emailInput = document.getElementById('email');
   const passwordInput = document.getElementById('password');
 
-  /*** ======= HELPERS ======= ***/
   function dayKey4am() {
     const now = new Date();
     if (now.getHours() < 4) now.setDate(now.getDate() - 1);
@@ -120,7 +115,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setBeg(rolledTasks.every(t => t.done));
   }
 
-  /*** ======= LOAD FROM SUPABASE ======= ***/
   async function loadTasksFromDB() {
     const { data, error } = await supabase.from('TaskLists').select('id,text');
     if (error) throw error;
@@ -132,7 +126,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     releaseOptions = data.map(r => r.text);
   }
 
-  /*** ======= UI RENDER ======= ***/
   function renderTasks() {
     const list = document.getElementById('taskList');
     list.innerHTML = "";
@@ -180,7 +173,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  /*** ======= TASK LOGIC ======= ***/
   function availablePool() {
     const used = new Set(rolledTasks.map(t => t.text));
     return allTasks.filter(t => !used.has(t));
@@ -200,7 +192,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  /*** ======= DECISION ======= ***/
   function msToDHMS(ms) {
     const s = Math.max(0, Math.floor(ms/1000));
     const h = Math.floor(s/3600);
@@ -238,7 +229,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     startCountdown(currentDecision.reveal_at, currentDecision.outcome);
   }
 
-  /*** ======= RESET ======= ***/
   async function resetToday() {
     await supabase.from('rolled_tasks').delete().eq('day_key', dayKey4am());
     await supabase.from('release_decisions').delete().eq('day_key', dayKey4am());
@@ -246,48 +236,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderTasks(); updateDecisionUI('idle'); setMessage("Reset complete.");
   }
 
-  /*** ======= AUTH ======= ***/
-  async function handleSignup() {
-    const { data, error } = await supabase.auth.signUp({
-      email: emailInput.value,
-      password: passwordInput.value
-    });
-    if (error) return alert(error.message);
-    alert("Check your email to confirm sign-up. Once confirmed, you can sign in.");
+  async function handleSignup(){
+    const { error } = await supabase.auth.signUp({ email: emailInput.value, password: passwordInput.value });
+    if(error) alert(error.message);
   }
-
-  async function handleSignin() {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: emailInput.value,
-      password: passwordInput.value
-    });
-    if (error) return alert(error.message);
-    user = data.user;
-    whoami.textContent = user.email;
-    showAppUI(true);
-    await initForUser();
+  async function handleSignin(){
+    const { error } = await supabase.auth.signInWithPassword({ email: emailInput.value, password: passwordInput.value });
+    if(error) alert(error.message);
   }
-
-  async function handleSignout() {
+  async function handleSignout(){
     await supabase.auth.signOut();
-    user = null;
-    showAppUI(false);
-    whoami.textContent = "—";
   }
 
-  /*** ======= SHOW/HIDE APP ======= ***/
   function showAppUI(show){ auth.style.display=show?'none':'block'; app.style.display=show?'block':'none'; }
 
-  /*** ======= INIT FOR USER ======= ***/
   async function initForUser() {
     await loadTasksFromDB();
     await loadReleaseOptionsFromDB();
     const { data } = await supabase.from('rolled_tasks').select('*').eq('day_key',dayKey4am());
     rolledTasks = data||[];
-    renderTasks(); refreshBegEnabled(); setMessage("Tasks ready.");
+    renderTasks();
+    refreshBegEnabled();
+    setMessage("Tasks ready.");
+
+    // Enable Get Task button now that user is fully initialized
+    nextTask.disabled = false;
   }
 
-  /*** ======= ATTACH EVENT LISTENERS ======= ***/
   nextTask.addEventListener('click', getRandomTask);
   resetBtn.addEventListener('click', resetToday);
   releaseBtn.addEventListener('click', begForRelease);
@@ -295,7 +270,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   signinBtn.addEventListener('click', handleSignin);
   signoutBtn.addEventListener('click', handleSignout);
 
-  /*** ======= AUTH STATE ======= ***/
   supabase.auth.onAuthStateChange(async(_,session)=>{
     user=session?.user||null;
     if(user){ whoami.textContent=user.email; showAppUI(true); initForUser();}
