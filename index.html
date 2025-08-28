@@ -1,86 +1,234 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>KAREENAISM Task Spinner</title>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { margin: 5px; }
+    .task { margin: 5px 0; }
+    .done { text-decoration: line-through; color: gray; }
+  </style>
 </head>
 <body>
   <h1>Praise Goddess KAREENA!</h1>
 
-  <!-- Auth controls -->
+  <!-- Login -->
   <input type="email" id="email" placeholder="Email">
   <input type="password" id="password" placeholder="Password">
-  <button id="signup">Sign Up</button>
   <button id="login">Login</button>
-  <button id="logout">Logout</button>
+  <button id="logout" style="display:none;">Logout</button>
 
   <hr>
 
-  <!-- Task button (starts disabled) -->
+  <!-- Tasks -->
   <button id="getTask" disabled>Get Task</button>
-  <p id="taskOutput"></p>
+  <div id="taskList"></div>
+  <p id="taskCounter">0/5 tasks complete today</p>
+
+  <hr>
+
+  <!-- Release -->
+  <button id="begRelease" disabled>Beg for Release</button>
+  <p id="releaseOutput"></p>
 
   <script>
-    // 🔥 Replace with your Firebase config
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-    };
-
-    // Init Firebase
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
+    // ---------------- Supabase Init ----------------
+    const supabase = window.supabase.createClient(
+      "https://djdhtdrseqfaiskvbvhb.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"
+    );
 
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
-    const signupBtn = document.getElementById("signup");
     const loginBtn = document.getElementById("login");
     const logoutBtn = document.getElementById("logout");
     const getTaskBtn = document.getElementById("getTask");
-    const taskOutput = document.getElementById("taskOutput");
+    const taskList = document.getElementById("taskList");
+    const taskCounter = document.getElementById("taskCounter");
+    const begReleaseBtn = document.getElementById("begRelease");
+    const releaseOutput = document.getElementById("releaseOutput");
 
-    // Fake task list (replace with yours later)
-    const tasks = [
-      "Bow to Goddess KAREENA 10 times.",
-      "Repeat 'Om Namah KAREENA' 33 times.",
-      "Spend 5 minutes staring at Her Holy Feet.",
-    ];
+    let currentUser = null;
+    let completedCount = 0;
 
-    // Signup
-    signupBtn.addEventListener("click", () => {
-      auth.createUserWithEmailAndPassword(emailInput.value, passwordInput.value)
-        .catch(err => alert(err.message));
+    // ---------------- Auth ----------------
+    loginBtn.addEventListener("click", async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.value,
+        password: passwordInput.value,
+      });
+      if (error) return alert(error.message);
+      currentUser = data.user;
+      console.log("✅ Logged in:", currentUser.email);
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      getTaskBtn.disabled = false;
+      loadTodayTasks();
+      checkReleaseDecision();
     });
 
-    // Login
-    loginBtn.addEventListener("click", () => {
-      auth.signInWithEmailAndPassword(emailInput.value, passwordInput.value)
-        .catch(err => alert(err.message));
+    logoutBtn.addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      currentUser = null;
+      getTaskBtn.disabled = true;
+      begReleaseBtn.disabled = true;
+      taskList.innerHTML = "";
+      taskCounter.innerText = "0/5 tasks complete today";
+      releaseOutput.innerText = "";
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
     });
 
-    // Logout
-    logoutBtn.addEventListener("click", () => {
-      auth.signOut();
-    });
+    // ---------------- Tasks ----------------
+    async function loadTodayTasks() {
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("rolled_tasks")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .eq("day_key", today);
 
-    // Auth state change
-    auth.onAuthStateChanged(user => {
-      if (user) {
-        console.log("✅ Logged in:", user.email);
-        getTaskBtn.disabled = false;  // enable button
-      } else {
-        console.log("❌ Logged out");
-        getTaskBtn.disabled = true;   // disable button
+      if (error) return console.error(error);
+      taskList.innerHTML = "";
+      completedCount = 0;
+
+      data.forEach(task => {
+        const div = document.createElement("div");
+        div.className = "task";
+        div.innerText = task.text;
+
+        if (!task.done) {
+          const btn = document.createElement("button");
+          btn.innerText = "Complete";
+          btn.onclick = () => markTaskComplete(task.id);
+          div.appendChild(btn);
+        } else {
+          div.classList.add("done");
+          completedCount++;
+        }
+        taskList.appendChild(div);
+      });
+
+      taskCounter.innerText = `${completedCount}/5 tasks complete today`;
+      begReleaseBtn.disabled = completedCount < 5;
+    }
+
+    getTaskBtn.addEventListener("click", async () => {
+      const today = new Date().toISOString().split("T")[0];
+
+      // fetch today's rolled tasks
+      const { data: rolled, error: rolledErr } = await supabase
+        .from("rolled_tasks")
+        .select("text")
+        .eq("user_id", currentUser.id)
+        .eq("day_key", today);
+      if (rolledErr) return console.error(rolledErr);
+
+      const rolledTasks = rolled.map(r => r.text);
+
+      // fetch all tasks
+      const { data: allTasks, error: allErr } = await supabase
+        .from("TaskLists")
+        .select("id, task");
+      if (allErr) return console.error(allErr);
+
+      // pick random unrolled task
+      const available = allTasks.filter(t => !rolledTasks.includes(t.task));
+      if (available.length === 0) {
+        alert("No more tasks available today!");
+        return;
       }
+      const randomTask = available[Math.floor(Math.random() * available.length)];
+
+      // insert into rolled_tasks
+      const { error: insertErr } = await supabase
+        .from("rolled_tasks")
+        .insert({
+          id: randomTask.id,
+          user_id: currentUser.id,
+          text: randomTask.task,
+          done: false,
+          day_key: today,
+          created_at: new Date()
+        });
+      if (insertErr) return console.error(insertErr);
+
+      loadTodayTasks();
     });
 
-    // Get random task
-    getTaskBtn.addEventListener("click", () => {
-      const randomTask = tasks[Math.floor(Math.random() * tasks.length)];
-      taskOutput.innerText = randomTask;
+    async function markTaskComplete(taskId) {
+      const { error } = await supabase
+        .from("rolled_tasks")
+        .update({ done: true })
+        .eq("id", taskId)
+        .eq("user_id", currentUser.id);
+      if (error) return console.error(error);
+      loadTodayTasks();
+    }
+
+    // ---------------- Release ----------------
+    async function checkReleaseDecision() {
+      const now = new Date().toISOString();
+      const today = new Date().toISOString().split("T")[0];
+
+      const { data: pendingDecisions, error } = await supabase
+        .from("release_decisions")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .eq("day_key", today)
+        .eq("status", "pending");
+
+      if (error) return console.error(error);
+
+      if (pendingDecisions.length > 0) {
+        // check if reveal_at passed
+        const decision = pendingDecisions[0];
+        if (new Date(decision.reveal_at) <= new Date()) {
+          // reveal
+          await supabase
+            .from("release_decisions")
+            .update({ status: "revealed" })
+            .eq("id", decision.id);
+          releaseOutput.innerText = `Goddess KAREENA says: ${decision.outcome}`;
+        } else {
+          releaseOutput.innerText = "Goddess KAREENA is deciding your fate...";
+        }
+      }
+    }
+
+    begReleaseBtn.addEventListener("click", async () => {
+      // pick random release option
+      const { data: options, error } = await supabase
+        .from("releaseOptions")
+        .select("*");
+      if (error) return console.error(error);
+
+      const randomOption = options[Math.floor(Math.random() * options.length)];
+
+      const delayMs = Math.floor(Math.random() * 30 * 60 * 1000) + 30000; // 30s to 30min
+      const revealAt = new Date(Date.now() + delayMs).toISOString();
+      const today = new Date().toISOString().split("T")[0];
+
+      const { error: insertErr } = await supabase
+        .from("release_decisions")
+        .insert({
+          id: randomOption.id,
+          user_id: currentUser.id,
+          status: "pending",
+          outcome: randomOption.decision,
+          reveal_at: revealAt,
+          day_key: today,
+          created_at: new Date()
+        });
+      if (insertErr) return console.error(insertErr);
+
+      releaseOutput.innerText = "Goddess KAREENA is deciding your fate...";
+      
+      // check again after reveal
+      setTimeout(checkReleaseDecision, delayMs + 1000);
+      begReleaseBtn.disabled = true;
     });
   </script>
 </body>
