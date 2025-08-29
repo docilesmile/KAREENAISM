@@ -64,13 +64,17 @@
       loginBtn.style.display = "none";
       logoutBtn.style.display = "inline-block";
 
-      // Load Tasks Module with Supabase client and update callback
+      // Load Tasks Module
       const { loadTasksModule } = await import('./tasksModule.js');
       loadTasksModule(supabase, updateBegRelease);
 
-      // Load Chastity Module with Supabase client
-      const { loadChastityModule } = await import('./chastityModule.js');
+      // Load Chastity Module
+      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
       loadChastityModule(supabase);
+
+      // Make reduceTimeForTask available globally for tasksModule
+      window.reduceTimeForTask = reduceTimeForTask;
+      window.attemptBegRelease = attemptBegRelease;
     });
 
     logoutBtn.addEventListener("click", async () => {
@@ -88,63 +92,8 @@
 
     // ---------------- Release ----------------
     begReleaseBtn.addEventListener("click", async () => {
-      if (!window.currentUser) return;
-
-      // Get latest chastity status
-      const { data: statusData, error: statusErr } = await supabase
-        .from("chastityStatus")
-        .select("*")
-        .eq("user_id", window.currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (statusErr) return console.error(statusErr);
-
-      const latest = statusData && statusData[0];
-      const now = new Date();
-
-      // Check if locked
-      if (latest && latest.is_locked && new Date(latest.release_date) > now) {
-        // Goddess KAREENA decides
-        const mercyRoll = Math.random() * 100; // 0-100
-        if (mercyRoll <= 5) {
-          // 5% chance of mercy
-          await supabase
-            .from("chastityStatus")
-            .update({ is_locked: false, release_date: now, source: "Goddess KAREENA's mercy" })
-            .eq("id", latest.id);
-
-          releaseOutput.innerText = "Goddess KAREENA has taken pity on you and grants early release… for now. Praise Her!";
-        } else {
-          // Goddess refuses → add punishment
-          const extraDays = Math.floor(Math.random() * 2) + 1; // +1 to 2 days
-          const newReleaseDate = new Date(latest.release_date);
-          newReleaseDate.setDate(newReleaseDate.getDate() + extraDays);
-
-          await supabase
-            .from("chastityStatus")
-            .update({ release_date: newReleaseDate, source: "Goddess KAREENA adds time as punishment" })
-            .eq("id", latest.id);
-
-          releaseOutput.innerText = `Goddess KAREENA refuses your plea. She extends your chastity by ${extraDays} day(s) and may add extra tasks.`;
-        }
-
-        // Refresh Chastity Module
-        const { loadChastityModule } = await import('./chastityModule.js');
-        loadChastityModule(supabase);
-
-      } else {
-        // Not locked → normal release option
-        const { data: options, error } = await supabase
-          .from("releaseOptions")
-          .select("*");
-
-        if (error) return console.error(error);
-
-        const randomOption = options[Math.floor(Math.random() * options.length)];
-        releaseOutput.innerText = `Goddess KAREENA says: ${randomOption.decision}`;
-      }
-
+      if (!window.currentUser || !window.attemptBegRelease) return;
+      await window.attemptBegRelease(supabase, releaseOutput);
       begReleaseBtn.disabled = true;
     });
 
