@@ -37,7 +37,7 @@
     // ---------------- Supabase Init ----------------
     const supabase = window.supabase.createClient(
       "https://djdhtdrseqfaiskvbvhb.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"
+      "YOUR_SUPABASE_ANON_KEY"
     );
 
     const emailInput = document.getElementById("email");
@@ -64,10 +64,13 @@
       loginBtn.style.display = "none";
       logoutBtn.style.display = "inline-block";
 
-      // Load Tasks Module dynamically
+      // Load Tasks Module
       const { loadTasksModule } = await import('./tasksModule.js');
-      loadTasksModule(supabase, updateBegRelease);
+      loadTasksModule();
 
+      // Load Chastity Module
+      const { loadChastityModule } = await import('./chastityModule.js');
+      loadChastityModule();
     });
 
     logoutBtn.addEventListener("click", async () => {
@@ -93,7 +96,6 @@
       if (error) return console.error(error);
 
       const randomOption = options[Math.floor(Math.random() * options.length)];
-
       releaseOutput.innerText = `Goddess KAREENA says: ${randomOption.decision}`;
       begReleaseBtn.disabled = true;
     });
@@ -102,8 +104,6 @@
     function updateBegRelease(completedTasks) {
       begReleaseBtn.disabled = completedTasks < 5;
     }
-
   </script>
 </body>
 </html>
-
