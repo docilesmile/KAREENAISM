@@ -1,10 +1,8 @@
 // tasksModule.js
-
-async function loadTasksModule() {
+export async function loadTasksModule() {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
 
-  // Create Tasks Module container
   const taskModuleDiv = document.createElement("div");
   taskModuleDiv.id = "tasksModule";
   taskModuleDiv.innerHTML = `
@@ -13,6 +11,7 @@ async function loadTasksModule() {
     <div id="taskList"></div>
     <p id="taskCounter">0/5 tasks complete today</p>
   `;
+  modulesContainer.innerHTML = ''; // clear placeholder text
   modulesContainer.appendChild(taskModuleDiv);
 
   const getTaskBtn = document.getElementById("getTaskBtn");
@@ -21,11 +20,10 @@ async function loadTasksModule() {
 
   let completedCount = 0;
 
-  // Enable button once user is logged in
+  // Enable button if user is logged in
   const enableTaskButton = () => {
     if (window.currentUser) getTaskBtn.disabled = false;
   };
-
   enableTaskButton();
 
   // ---------------- Tasks ----------------
@@ -37,8 +35,8 @@ async function loadTasksModule() {
       .select("*")
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today);
-
     if (error) return console.error(error);
+
     taskList.innerHTML = "";
     completedCount = 0;
 
@@ -117,8 +115,9 @@ async function loadTasksModule() {
     loadTodayTasks();
   });
 
+  // initial load
+  loadTodayTasks();
+
   // Refresh tasks when user logs in
   document.addEventListener("userLoggedIn", enableTaskButton);
 }
-
-loadTasksModule();
