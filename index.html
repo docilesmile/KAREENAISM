@@ -33,11 +33,11 @@
   <button id="begRelease" disabled>Beg for Release</button>
   <p id="releaseOutput"></p>
 
-  <script>
+  <script type="module">
     // ---------------- Supabase Init ----------------
     const supabase = window.supabase.createClient(
       "https://djdhtdrseqfaiskvbvhb.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"
+      "YOUR_ANON_KEY_HERE"
     );
 
     const emailInput = document.getElementById("email");
@@ -48,7 +48,7 @@
     const releaseOutput = document.getElementById("releaseOutput");
 
     let currentUser = null;
-    window.currentUser = null; // Make it global for modules
+    window.currentUser = null; // global for modules
 
     // ---------------- Auth ----------------
     loginBtn.addEventListener("click", async () => {
@@ -59,18 +59,16 @@
       if (error) return alert(error.message);
 
       currentUser = data.user;
-      window.currentUser = currentUser; // Make available globally
-      console.log("✅ Logged in:", currentUser.email);
+      window.currentUser = currentUser;
 
       loginBtn.style.display = "none";
       logoutBtn.style.display = "inline-block";
 
-      // Load the task module dynamically
-      import('./tasksModule.js').then(module => {
-        module.loadTasksModule();
-      });
+      // Load Tasks Module dynamically
+      const { loadTasksModule } = await import('./tasksModule.js');
+      loadTasksModule();
 
-      // Load release module (optional, can modularize later)
+      // Load release module (or leave inline here)
       checkReleaseDecision();
     });
 
@@ -126,7 +124,7 @@
 
       const randomOption = options[Math.floor(Math.random() * options.length)];
 
-      const delayMs = Math.floor(Math.random() * 30 * 60 * 1000) + 30000;
+      const delayMs = Math.floor(Math.random() * 30 * 60 * 1000) + 30000; // 30s-30min
       const revealAt = new Date(Date.now() + delayMs).toISOString();
       const today = new Date().toISOString().split("T")[0];
 
@@ -149,8 +147,5 @@
       setTimeout(checkReleaseDecision, delayMs + 1000);
     });
   </script>
-
-  <!-- Load the tasks module as a separate JS file -->
-  <script type="module" src="tasksModule.js"></script>
 </body>
 </html>
