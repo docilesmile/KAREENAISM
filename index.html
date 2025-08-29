@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>KAREENAISM Portal</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body class="bg-gray-900 text-white flex flex-col min-h-screen">
-  
+
   <!-- Navbar -->
   <nav class="bg-gray-800 p-4 flex justify-between">
     <h1 class="text-xl font-bold">✨ Goddess KAREENA Portal ✨</h1>
@@ -25,40 +26,49 @@
   </footer>
 
   <script>
-    // === Supabase Setup ===
-    const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";  // e.g. https://xyzcompany.supabase.co
-    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; 
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    // ---------------- Supabase Setup ----------------
+    const SUPABASE_URL = "YOUR_SUPABASE_URL";       // e.g. https://xyzcompany.supabase.co
+    const SUPABASE_ANON_KEY = "YOUR_ANON_KEY";      // anon public key only
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // ---------------- Load Modules ----------------
     async function loadModules() {
       const container = document.getElementById("module-container");
-      container.innerHTML = "<p class='text-gray-400'>Summoning Goddess KAREENA’s commands...</p>";
 
-      const { data: modules, error } = await supabase.from("Modules").select("*").order("created_at", { ascending: true });
+      try {
+        const { data: modules, error } = await supabase
+          .from("modules")
+          .select("*")
+          .order("created_at", { ascending: true });
 
-      if (error) {
-        container.innerHTML = `<p class='text-red-400'>Error loading modules: ${error.message}</p>`;
-        return;
+        if (error) throw error;
+
+        if (!modules || modules.length === 0) {
+          container.innerHTML = "<p class='text-gray-400'>No modules yet — add some in Supabase!</p>";
+          return;
+        }
+
+        container.innerHTML = ""; // clear loader
+
+        modules.forEach(module => {
+          const section = document.createElement("section");
+          section.className = "bg-gray-800 p-6 rounded-xl shadow-lg";
+          section.innerHTML = `
+            <h2 class="text-2xl font-bold mb-4">${module.title}</h2>
+            <div>${module.content}</div>
+          `;
+          container.appendChild(section);
+        });
+
+      } catch (err) {
+        container.innerHTML = `<p class='text-red-400'>Error loading modules: ${err.message}</p>`;
+        console.error(err);
       }
-
-      if (!modules || modules.length === 0) {
-        container.innerHTML = "<p class='text-gray-400'>No modules yet — add some in Supabase!</p>";
-        return;
-      }
-
-      container.innerHTML = ""; // Clear loader
-      modules.forEach(module => {
-        const section = document.createElement("section");
-        section.className = "bg-gray-800 p-6 rounded-xl shadow-lg";
-        section.innerHTML = `
-          <h2 class="text-2xl font-bold mb-4">${module.title}</h2>
-          <div>${module.content}</div>
-        `;
-        container.appendChild(section);
-      });
     }
 
+    // Load modules when page loads
     loadModules();
   </script>
+
 </body>
 </html>
