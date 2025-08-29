@@ -1,11 +1,18 @@
-document.addEventListener("DOMContentLoaded", () => {
-  // ---------------- DOM Elements ----------------
+// tasksModule.js
+
+export function loadTasksModule() {
   const getTaskBtn = document.getElementById("getTask");
   const taskList = document.getElementById("taskList");
   const taskCounter = document.getElementById("taskCounter");
-
-  let currentUser = window.currentUser; // assumes index.html sets this after login
+  const begReleaseBtn = document.getElementById("begRelease");
   let completedCount = 0;
+
+  if (!window.currentUser) {
+    console.error("No currentUser set. Make sure you call loadTasksModule() after login.");
+    return;
+  }
+
+  const currentUser = window.currentUser;
 
   // ---------------- Tasks ----------------
   async function loadTodayTasks() {
@@ -34,12 +41,10 @@ document.addEventListener("DOMContentLoaded", () => {
         div.classList.add("done");
         completedCount++;
       }
-
       taskList.appendChild(div);
     });
 
     taskCounter.innerText = `${completedCount}/5 tasks complete today`;
-    const begReleaseBtn = document.getElementById("begRelease");
     if (begReleaseBtn) begReleaseBtn.disabled = completedCount < 5;
   }
 
@@ -49,13 +54,12 @@ document.addEventListener("DOMContentLoaded", () => {
       .update({ done: true })
       .eq("id", taskId)
       .eq("user_id", currentUser.id);
-
     if (error) return console.error(error);
     loadTodayTasks();
   }
 
-  // ---------------- Get Task Button ----------------
   if (getTaskBtn) {
+    getTaskBtn.disabled = false;
     getTaskBtn.addEventListener("click", async () => {
       const today = new Date().toISOString().split("T")[0];
 
@@ -100,6 +104,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------- Initialize ----------------
-  if (currentUser) loadTodayTasks();
-});
+  // Load tasks immediately after module initialization
+  loadTodayTasks();
+}
