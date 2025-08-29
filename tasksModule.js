@@ -67,6 +67,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
   async function markTaskComplete(taskId, difficulty) {
     if (!window.currentUser) return;
 
+    // Mark task as done in DB
     const { error } = await supabase
       .from("rolled_tasks")
       .update({ done: true })
@@ -76,13 +77,12 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (error) return console.error(error);
 
     // ---------------- Reduce chastity time ----------------
-    if (window.reduceTimeForTask) {
-      // Map difficulty to minutes
-      let minutes = 0;
-      if (difficulty === "Easy") minutes = 30;
-      else if (difficulty === "Medium") minutes = 60;
-      else if (difficulty === "Hard") minutes = 180;
+    let minutes = 0;
+    if (difficulty === "Easy") minutes = 30;
+    else if (difficulty === "Medium") minutes = 60;
+    else if (difficulty === "Hard") minutes = 180;
 
+    if (window.reduceTimeForTask) {
       await window.reduceTimeForTask(minutes);
     }
 
