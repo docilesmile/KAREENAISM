@@ -130,6 +130,59 @@ export async function loadChastityModule(supabase) {
   }
   schedulePenaltyCheck();
 
+  // ---------------- Beg for Release ----------------
+  window.attemptBegRelease = async function(supabase, outputElement) {
+    if (!window.currentUser) return;
+
+    const { data: statusData, error: statusErr } = await supabase
+      .from("chastityStatus")
+      .select("*")
+      .eq("user_id", window.currentUser.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (statusErr || !statusData || statusData.length === 0) return;
+
+    const latest = statusData[0];
+    const now = new Date();
+
+    if (latest.is_locked && new Date(latest.release_date) > now) {
+      // 5% chance of mercy
+      const mercyRoll = Math.random() * 100;
+      if (mercyRoll <= 5) {
+        await supabase
+          .from("chastityStatus")
+          .update({ is_locked: false, release_date: now, source: "Goddess KAREENA's mercy" })
+          .eq("id", latest.id);
+        outputElement.innerText = "Goddess KAREENA has taken pity on you and grants early release… Praise Her!";
+      } else {
+        // Refuse → add 1-2 days punishment
+        const extraDays = Math.floor(Math.random() * 2) + 1;
+        const newReleaseDate = new Date(latest.release_date);
+        newReleaseDate.setDate(newReleaseDate.getDate() + extraDays);
+
+        await supabase
+          .from("chastityStatus")
+          .update({ release_date: newReleaseDate, source: "Goddess KAREENA adds time as punishment" })
+          .eq("id", latest.id);
+
+        outputElement.innerText = `Goddess KAREENA refuses your plea. She extends your chastity by ${extraDays} day(s) and may add extra tasks.`;
+      }
+
+    } else {
+      // Not locked → normal release option
+      const { data: options, error } = await supabase
+        .from("releaseOptions")
+        .select("*");
+      if (error) return console.error(error);
+
+      const randomOption = options[Math.floor(Math.random() * options.length)];
+      outputElement.innerText = `Goddess KAREENA says: ${randomOption.decision}`;
+    }
+
+    getChastityStatus();
+  };
+
   await getChastityStatus();
   setInterval(getChastityStatus, 60_000); // refresh every minute
 }
