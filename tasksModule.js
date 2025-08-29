@@ -49,7 +49,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       if (!task.done) {
         const btn = document.createElement("button");
         btn.innerText = "Complete";
-        btn.onclick = () => markTaskComplete(task.id);
+        btn.onclick = () => markTaskComplete(task.id, task.difficulty);
         div.appendChild(btn);
       } else {
         div.classList.add("done");
@@ -62,15 +62,21 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (updateBegRelease) updateBegRelease(completedCount);
   }
 
-  async function markTaskComplete(taskId) {
+  async function markTaskComplete(taskId, difficulty) {
     if (!window.currentUser) return;
+
     const { error } = await supabase
       .from("rolled_tasks")
       .update({ done: true })
       .eq("id", taskId)
       .eq("user_id", window.currentUser.id);
-
     if (error) return console.error(error);
+
+    // Update chastity based on task difficulty
+    if (typeof window.updateChastityByTasks === "function") {
+      await window.updateChastityByTasks(difficulty);
+    }
+
     loadTodayTasks();
   }
 
@@ -78,7 +84,6 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (!window.currentUser) return;
     const today = new Date().toISOString().split("T")[0];
 
-    // fetch today's rolled tasks
     const { data: rolled, error: rolledErr } = await supabase
       .from("rolled_tasks")
       .select("text")
@@ -88,14 +93,12 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (rolledErr) return console.error(rolledErr);
     const rolledTasks = rolled.map(r => r.text);
 
-    // fetch all tasks
     const { data: allTasks, error: allErr } = await supabase
       .from("TaskLists")
-      .select("id, task");
+      .select("id, task, difficulty");
 
     if (allErr) return console.error(allErr);
 
-    // pick random unrolled task
     const available = allTasks.filter(t => !rolledTasks.includes(t.task));
     if (available.length === 0) {
       alert("No more tasks available today!");
@@ -108,6 +111,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       .insert({
         user_id: window.currentUser.id,
         text: randomTask.task,
+        difficulty: randomTask.difficulty,
         done: false,
         day_key: today,
         created_at: new Date()
@@ -116,6 +120,17 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (insertErr) return console.error(insertErr);
     loadTodayTasks();
   });
+
+  // ----------------- Incomplete Task Penalties at 2AM -----------------
+  setInterval(async () => {
+    const now = new Date();
+    if (now.getHours() === 2 && now.getMinutes() === 0) {
+      if (typeof window.applyIncompleteTaskPenalties === "function") {
+        await window.applyIncompleteTaskPenalties(supabase);
+        loadTodayTasks(); // refresh task list after penalties
+      }
+    }
+  }, 60_000); // check every minute
 
   loadTodayTasks();
   document.addEventListener("userLoggedIn", enableTaskButton);
