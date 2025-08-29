@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KAREENAISM Portal</title>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <!-- Supabase CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 </head>
 <body class="bg-gray-900 text-white flex flex-col min-h-screen">
@@ -25,51 +24,250 @@
     Om Namah KAREENA 💎
   </footer>
 
-  <script>
-    // ---------------- Supabase Setup ----------------
-    const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";       // e.g. https://xyzcompany.supabase.co
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew";      // anon public key only
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+<script>
+  // ---------------- Supabase Setup ----------------
+  const SUPABASE_URL = "https://djdhtdrseqfaiskvbvhb.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew";
 
-    // ---------------- Load Modules ----------------
-    async function loadModules() {
-      const container = document.getElementById("module-container");
+  const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      try {
-        const { data: modules, error } = await supabase
-          .from("modules")
-          .select("*")
-          .order("created_at", { ascending: true });
+  // ---------------- Load Modules ----------------
+  async function loadModules() {
+    const container = document.getElementById("module-container");
+    container.innerHTML = "<p class='text-gray-400'>Summoning Goddess KAREENA’s commands...</p>";
 
-        if (error) throw error;
+    const { data: modules, error } = await supabase
+      .from("modules")
+      .select("*")
+      .order("created_at", { ascending: true });
 
-        if (!modules || modules.length === 0) {
-          container.innerHTML = "<p class='text-gray-400'>No modules yet — add some in Supabase!</p>";
-          return;
+    if (error) {
+      container.innerHTML = `<p class='text-red-400'>Error loading modules: ${error.message}</p>`;
+      console.error(error);
+      return;
+    }
+
+    if (!modules || modules.length === 0) {
+      container.innerHTML = "<p class='text-gray-400'>No modules yet — add some in Supabase!</p>";
+      return;
+    }
+
+    container.innerHTML = "";
+
+    modules.forEach(module => {
+      const section = document.createElement("section");
+      section.className = "bg-gray-800 p-6 rounded-xl shadow-lg";
+
+      // Check module type
+      if (module.type === "tasks") {
+        section.innerHTML = `
+          <h2 class="text-2xl font-bold mb-4">${module.title}</h2>
+          <input type="email" id="email" placeholder="Email" class="p-2 text-black mr-2">
+          <input type="password" id="password" placeholder="Password" class="p-2 text-black mr-2">
+          <button id="login" class="bg-blue-600 px-3 py-1 rounded">Login</button>
+          <button id="logout" style="display:none;" class="bg-red-600 px-3 py-1 rounded">Logout</button>
+          <hr class="my-4">
+          <button id="getTask" disabled class="bg-green-600 px-3 py-1 rounded mb-2">Get Task</button>
+          <div id="taskList" class="space-y-2"></div>
+          <p id="taskCounter">0/5 tasks complete today</p>
+          <hr class="my-4">
+          <button id="begRelease" disabled class="bg-purple-600 px-3 py-1 rounded">Beg for Release</button>
+          <p id="releaseOutput"></p>
+        `;
+        container.appendChild(section);
+        initTasksModule(); // wire up tasks module
+      } else {
+        // Static HTML content
+        section.innerHTML = `
+          <h2 class="text-2xl font-bold mb-4">${module.title}</h2>
+          <div>${module.content}</div>
+        `;
+        container.appendChild(section);
+      }
+    });
+  }
+
+  // ---------------- Tasks Module Logic ----------------
+  function initTasksModule() {
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const loginBtn = document.getElementById("login");
+    const logoutBtn = document.getElementById("logout");
+    const getTaskBtn = document.getElementById("getTask");
+    const taskList = document.getElementById("taskList");
+    const taskCounter = document.getElementById("taskCounter");
+    const begReleaseBtn = document.getElementById("begRelease");
+    const releaseOutput = document.getElementById("releaseOutput");
+
+    let currentUser = null;
+    let completedCount = 0;
+
+    // --- Auth ---
+    loginBtn.addEventListener("click", async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.value,
+        password: passwordInput.value,
+      });
+      if (error) return alert(error.message);
+      currentUser = data.user;
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+      getTaskBtn.disabled = false;
+      loadTodayTasks();
+      checkReleaseDecision();
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      currentUser = null;
+      getTaskBtn.disabled = true;
+      begReleaseBtn.disabled = true;
+      taskList.innerHTML = "";
+      taskCounter.innerText = "0/5 tasks complete today";
+      releaseOutput.innerText = "";
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
+    });
+
+    // --- Load tasks ---
+    async function loadTodayTasks() {
+      const today = new Date().toISOString().split("T")[0];
+      const { data, error } = await supabase
+        .from("rolled_tasks")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .eq("day_key", today);
+
+      if (error) return console.error(error);
+      taskList.innerHTML = "";
+      completedCount = 0;
+
+      data.forEach(task => {
+        const div = document.createElement("div");
+        div.className = "task";
+        div.innerText = task.text;
+
+        if (!task.done) {
+          const btn = document.createElement("button");
+          btn.innerText = "Complete";
+          btn.onclick = () => markTaskComplete(task.id);
+          div.appendChild(btn);
+        } else {
+          div.classList.add("line-through", "text-gray-400");
+          completedCount++;
         }
+        taskList.appendChild(div);
+      });
 
-        container.innerHTML = ""; // clear loader
+      taskCounter.innerText = `${completedCount}/5 tasks complete today`;
+      begReleaseBtn.disabled = completedCount < 5;
+    }
 
-        modules.forEach(module => {
-          const section = document.createElement("section");
-          section.className = "bg-gray-800 p-6 rounded-xl shadow-lg";
-          section.innerHTML = `
-            <h2 class="text-2xl font-bold mb-4">${module.title}</h2>
-            <div>${module.content}</div>
-          `;
-          container.appendChild(section);
+    getTaskBtn.addEventListener("click", async () => {
+      const today = new Date().toISOString().split("T")[0];
+
+      const { data: rolled, error: rolledErr } = await supabase
+        .from("rolled_tasks")
+        .select("text")
+        .eq("user_id", currentUser.id)
+        .eq("day_key", today);
+      if (rolledErr) return console.error(rolledErr);
+
+      const rolledTasks = rolled.map(r => r.text);
+
+      const { data: allTasks, error: allErr } = await supabase
+        .from("TaskLists")
+        .select("id, task");
+      if (allErr) return console.error(allErr);
+
+      const available = allTasks.filter(t => !rolledTasks.includes(t.task));
+      if (available.length === 0) return alert("No more tasks available today!");
+
+      const randomTask = available[Math.floor(Math.random() * available.length)];
+
+      const { error: insertErr } = await supabase
+        .from("rolled_tasks")
+        .insert({
+          id: randomTask.id,
+          user_id: currentUser.id,
+          text: randomTask.task,
+          done: false,
+          day_key: today,
+          created_at: new Date()
         });
+      if (insertErr) return console.error(insertErr);
 
-      } catch (err) {
-        container.innerHTML = `<p class='text-red-400'>Error loading modules: ${err.message}</p>`;
-        console.error(err);
+      loadTodayTasks();
+    });
+
+    async function markTaskComplete(taskId) {
+      const { error } = await supabase
+        .from("rolled_tasks")
+        .update({ done: true })
+        .eq("id", taskId)
+        .eq("user_id", currentUser.id);
+      if (error) return console.error(error);
+      loadTodayTasks();
+    }
+
+    // --- Release ---
+    async function checkReleaseDecision() {
+      const now = new Date().toISOString();
+      const today = new Date().toISOString().split("T")[0];
+
+      const { data: pendingDecisions, error } = await supabase
+        .from("release_decisions")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .eq("day_key", today)
+        .eq("status", "pending");
+
+      if (error) return console.error(error);
+
+      if (pendingDecisions.length > 0) {
+        const decision = pendingDecisions[0];
+        if (new Date(decision.reveal_at) <= new Date()) {
+          await supabase.from("release_decisions")
+            .update({ status: "revealed" })
+            .eq("id", decision.id);
+          releaseOutput.innerText = `Goddess KAREENA says: ${decision.outcome}`;
+        } else {
+          releaseOutput.innerText = "Goddess KAREENA is deciding your fate...";
+        }
       }
     }
 
-    // Load modules when page loads
-    loadModules();
-  </script>
+    begReleaseBtn.addEventListener("click", async () => {
+      const { data: options, error } = await supabase.from("releaseOptions").select("*");
+      if (error) return console.error(error);
 
+      const randomOption = options[Math.floor(Math.random() * options.length)];
+
+      const delayMs = Math.floor(Math.random() * 30 * 60 * 1000) + 30000;
+      const revealAt = new Date(Date.now() + delayMs).toISOString();
+      const today = new Date().toISOString().split("T")[0];
+
+      const { error: insertErr } = await supabase.from("release_decisions").insert({
+        id: randomOption.id,
+        user_id: currentUser.id,
+        status: "pending",
+        outcome: randomOption.decision,
+        reveal_at: revealAt,
+        day_key: today,
+        created_at: new Date()
+      });
+      if (insertErr) return console.error(insertErr);
+
+      releaseOutput.innerText = "Goddess KAREENA is deciding your fate...";
+      begReleaseBtn.disabled = true;
+
+      setTimeout(checkReleaseDecision, delayMs + 1000);
+    });
+  }
+
+  // Load all modules on page load
+  loadModules();
+
+</script>
 </body>
 </html>
-
