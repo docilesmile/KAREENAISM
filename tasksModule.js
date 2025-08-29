@@ -44,12 +44,14 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     data.forEach(task => {
       const div = document.createElement("div");
       div.className = "task";
-      div.innerText = task.text;
+      div.innerText = `${task.text} [${task.difficulty || "Easy"}]`;
 
       if (!task.done) {
         const btn = document.createElement("button");
         btn.innerText = "Complete";
-        btn.onclick = () => markTaskComplete(task.id, task.difficulty);
+        btn.onclick = async () => {
+          await markTaskComplete(task.id, task.difficulty);
+        };
         div.appendChild(btn);
       } else {
         div.classList.add("done");
@@ -73,8 +75,16 @@ export async function loadTasksModule(supabase, updateBegRelease) {
 
     if (error) return console.error(error);
 
-    // Reduce chastity time based on difficulty
-    if (window.updateChastityByTasks) window.updateChastityByTasks(difficulty);
+    // ---------------- Reduce chastity time ----------------
+    if (window.reduceTimeForTask) {
+      // Map difficulty to minutes
+      let minutes = 0;
+      if (difficulty === "Easy") minutes = 30;
+      else if (difficulty === "Medium") minutes = 60;
+      else if (difficulty === "Hard") minutes = 180;
+
+      await window.reduceTimeForTask(minutes);
+    }
 
     loadTodayTasks();
   }
@@ -96,7 +106,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     // fetch all tasks
     const { data: allTasks, error: allErr } = await supabase
       .from("TaskLists")
-      .select("id, task, category, difficulty");
+      .select("id, task, difficulty");
 
     if (allErr) return console.error(allErr);
 
@@ -113,8 +123,8 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       .insert({
         user_id: window.currentUser.id,
         text: randomTask.task,
-        difficulty: randomTask.difficulty,
         done: false,
+        difficulty: randomTask.difficulty || "Easy",
         day_key: today,
         created_at: new Date()
       });
@@ -122,20 +132,6 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (insertErr) return console.error(insertErr);
     loadTodayTasks();
   });
-
-  // ---------------- Schedule 2AM incomplete task penalties ----------------
-  function schedulePenaltyCheck() {
-    const now = new Date();
-    const next2AM = new Date();
-    next2AM.setHours(2, 0, 0, 0);
-    if (now >= next2AM) next2AM.setDate(next2AM.getDate() + 1);
-    const delay = next2AM - now;
-    setTimeout(async () => {
-      if (window.applyIncompleteTaskPenalties) await window.applyIncompleteTaskPenalties(supabase);
-      schedulePenaltyCheck(); // schedule next day
-    }, delay);
-  }
-  schedulePenaltyCheck();
 
   loadTodayTasks();
   document.addEventListener("userLoggedIn", enableTaskButton);
