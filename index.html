@@ -2,45 +2,107 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>KAREENAISM Tasks</title>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  <script src="tasksmodule.js" defer></script>
+  <title>KAREENAISM Task Spinner</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #111;
-      color: #eee;
-      text-align: center;
-      padding: 50px;
-    }
-    button {
-      background: #b30059;
-      color: white;
-      padding: 12px 20px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-top: 20px;
-    }
-    button:hover {
-      background: #ff007f;
-    }
-    #taskDisplay {
-      margin-top: 30px;
-      font-size: 18px;
-      padding: 20px;
-      background: #222;
-      border-radius: 10px;
-      display: inline-block;
-      min-width: 300px;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    button { margin: 5px; }
+    .task { margin: 5px 0; }
+    .done { text-decoration: line-through; color: gray; }
   </style>
 </head>
 <body>
-  <h1>Praise Goddess KAREENA</h1>
-  <p>Click below to receive your holy task:</p>
-  <button id="getTask">Get Task</button>
-  <div id="taskDisplay">No task yet.</div>
+  <h1>Praise Goddess KAREENA!</h1>
+
+  <!-- Login -->
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <button id="login">Login</button>
+  <button id="logout" style="display:none;">Logout</button>
+
+  <hr>
+
+  <!-- Placeholder for modules -->
+  <div id="modulesContainer">
+    Loading Modules from Goddess KAREENA's will...
+  </div>
+
+  <hr>
+
+  <!-- Release -->
+  <button id="begRelease" disabled>Beg for Release</button>
+  <p id="releaseOutput"></p>
+
+  <script type="module">
+    // ---------------- Supabase Init ----------------
+    const supabase = window.supabase.createClient(
+      "https://djdhtdrseqfaiskvbvhb.supabase.co",
+      "YOUR_ANON_KEY_HERE"
+    );
+
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const loginBtn = document.getElementById("login");
+    const logoutBtn = document.getElementById("logout");
+    const begReleaseBtn = document.getElementById("begRelease");
+    const releaseOutput = document.getElementById("releaseOutput");
+
+    let currentUser = null;
+    window.currentUser = null;
+
+    // ---------------- Auth ----------------
+    loginBtn.addEventListener("click", async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.value,
+        password: passwordInput.value,
+      });
+      if (error) return alert(error.message);
+
+      currentUser = data.user;
+      window.currentUser = currentUser;
+
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+
+      // Load Tasks Module dynamically
+      const { loadTasksModule } = await import('./tasksModule.js');
+      loadTasksModule(supabase, updateBegRelease);
+
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      currentUser = null;
+      window.currentUser = null;
+
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
+
+      document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
+      begReleaseBtn.disabled = true;
+      releaseOutput.innerText = "";
+    });
+
+    // ---------------- Release ----------------
+    begReleaseBtn.addEventListener("click", async () => {
+      if (!currentUser) return;
+
+      const { data: options, error } = await supabase
+        .from("releaseOptions")
+        .select("*");
+      if (error) return console.error(error);
+
+      const randomOption = options[Math.floor(Math.random() * options.length)];
+
+      releaseOutput.innerText = `Goddess KAREENA says: ${randomOption.decision}`;
+      begReleaseBtn.disabled = true;
+    });
+
+    // Function to enable Beg Release after 5 tasks
+    function updateBegRelease(completedTasks) {
+      begReleaseBtn.disabled = completedTasks < 5;
+    }
+
+  </script>
 </body>
 </html>
