@@ -16,8 +16,8 @@
 
   <!-- Login -->
   <form id="loginForm" onsubmit="return false;">
-    <input type="email" id="email" placeholder="Email">
-    <input type="password" id="password" placeholder="Password">
+    <input type="email" id="email" placeholder="Email" autocomplete="username">
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password">
     <button id="login">Login</button>
   </form>
   <button id="logout" style="display:none;">Logout</button>
@@ -67,11 +67,11 @@
       logoutBtn.style.display = "inline-block";
 
       // Load Tasks Module
-      const { loadTasksModule } = await import('./KAREENAISM/tasksModule.js');
+      const { loadTasksModule } = await import('/KAREENAISM/tasksModule.js');
       loadTasksModule(supabase, updateBegRelease);
 
       // Load Chastity Module
-      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./KAREENAISM/chastityModule.js');
+      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('/KAREENAISM/chastityModule.js');
       await loadChastityModule(supabase);
 
       // Make these globally available for tasks module
