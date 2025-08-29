@@ -64,13 +64,13 @@
       loginBtn.style.display = "none";
       logoutBtn.style.display = "inline-block";
 
-      // Load Tasks Module
+      // Load Tasks Module with Supabase client and update callback
       const { loadTasksModule } = await import('./tasksModule.js');
-      loadTasksModule();
+      loadTasksModule(supabase, updateBegRelease);
 
-      // Load Chastity Module
+      // Load Chastity Module with Supabase client
       const { loadChastityModule } = await import('./chastityModule.js');
-      loadChastityModule();
+      loadChastityModule(supabase);
     });
 
     logoutBtn.addEventListener("click", async () => {
@@ -107,4 +107,3 @@
   </script>
 </body>
 </html>
-
