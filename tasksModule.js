@@ -1,7 +1,6 @@
 // tasksModule.js
 export async function loadTasksModule(supabase, updateBegRelease) {
   if (!supabase) throw new Error("Supabase client must be passed into tasksModule");
-
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
 
@@ -10,10 +9,10 @@ export async function loadTasksModule(supabase, updateBegRelease) {
   taskModuleDiv.innerHTML = `
     <h2>Daily Tasks</h2>
     <button id="getTaskBtn" disabled>Get Task</button>
-    <div id="taskList"></div>
+    <div id="taskList">Loading tasks...</div>
     <p id="taskCounter">0/5 tasks complete today</p>
   `;
-  modulesContainer.innerHTML = ''; // clear placeholder text
+  modulesContainer.innerHTML = '';
   modulesContainer.appendChild(taskModuleDiv);
 
   const getTaskBtn = document.getElementById("getTaskBtn");
@@ -56,7 +55,6 @@ export async function loadTasksModule(supabase, updateBegRelease) {
         div.classList.add("done");
         completedCount++;
       }
-
       taskList.appendChild(div);
     });
 
@@ -88,7 +86,6 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       .eq("day_key", today);
 
     if (rolledErr) return console.error(rolledErr);
-
     const rolledTasks = rolled.map(r => r.text);
 
     // fetch all tasks
@@ -98,18 +95,17 @@ export async function loadTasksModule(supabase, updateBegRelease) {
 
     if (allErr) return console.error(allErr);
 
+    // pick random unrolled task
     const available = allTasks.filter(t => !rolledTasks.includes(t.task));
     if (available.length === 0) {
       alert("No more tasks available today!");
       return;
     }
-
     const randomTask = available[Math.floor(Math.random() * available.length)];
 
     const { error: insertErr } = await supabase
       .from("rolled_tasks")
       .insert({
-        id: randomTask.id,
         user_id: window.currentUser.id,
         text: randomTask.task,
         done: false,
@@ -118,12 +114,9 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       });
 
     if (insertErr) return console.error(insertErr);
-
     loadTodayTasks();
   });
 
-  // initial load
   loadTodayTasks();
-
   document.addEventListener("userLoggedIn", enableTaskButton);
 }
