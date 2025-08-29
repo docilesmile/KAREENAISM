@@ -2,17 +2,45 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>KAREENAISM | Task System</title>
+  <title>KAREENAISM Tasks</title>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  <script src="tasksmodule.js" defer></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #eee;
+      text-align: center;
+      padding: 50px;
+    }
+    button {
+      background: #b30059;
+      color: white;
+      padding: 12px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #ff007f;
+    }
+    #taskDisplay {
+      margin-top: 30px;
+      font-size: 18px;
+      padding: 20px;
+      background: #222;
+      border-radius: 10px;
+      display: inline-block;
+      min-width: 300px;
+    }
+  </style>
 </head>
 <body>
   <h1>Praise Goddess KAREENA</h1>
-  <div id="modulesContainer">Loading modules…</div>
-
-  <script type="module">
-    import { loadTasksModule } from "./tasksModule.js";
-    document.addEventListener("DOMContentLoaded", () => {
-      loadTasksModule();
-    });
-  </script>
+  <p>Click below to receive your holy task:</p>
+  <button id="getTask">Get Task</button>
+  <div id="taskDisplay">No task yet.</div>
 </body>
 </html>
