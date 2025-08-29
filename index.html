@@ -15,9 +15,11 @@
   <h1>Praise Goddess KAREENA!</h1>
 
   <!-- Login -->
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <button id="login">Login</button>
+  <form id="loginForm" onsubmit="return false;">
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button id="login">Login</button>
+  </form>
   <button id="logout" style="display:none;">Logout</button>
 
   <hr>
@@ -65,14 +67,14 @@
       logoutBtn.style.display = "inline-block";
 
       // Load Tasks Module
-      const { loadTasksModule } = await import('./tasksModule.js');
+      const { loadTasksModule } = await import('./KAREENAISM/tasksModule.js');
       loadTasksModule(supabase, updateBegRelease);
 
       // Load Chastity Module
-      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
-      loadChastityModule(supabase);
+      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./KAREENAISM/chastityModule.js');
+      await loadChastityModule(supabase);
 
-      // Make reduceTimeForTask available globally for tasksModule
+      // Make these globally available for tasks module
       window.reduceTimeForTask = reduceTimeForTask;
       window.attemptBegRelease = attemptBegRelease;
     });
