@@ -1,9 +1,8 @@
 // tasksModule.js
-export async function loadTasksModule() {
+export async function loadTasksModule(supabase, updateBegRelease) {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
 
-  // Create module UI
   const taskModuleDiv = document.createElement("div");
   taskModuleDiv.id = "tasksModule";
   taskModuleDiv.innerHTML = `
@@ -12,7 +11,7 @@ export async function loadTasksModule() {
     <div id="taskList"></div>
     <p id="taskCounter">0/5 tasks complete today</p>
   `;
-  modulesContainer.innerHTML = ""; // clear placeholder
+  modulesContainer.innerHTML = '';
   modulesContainer.appendChild(taskModuleDiv);
 
   const getTaskBtn = document.getElementById("getTaskBtn");
@@ -20,47 +19,90 @@ export async function loadTasksModule() {
   const taskCounter = document.getElementById("taskCounter");
 
   let completedCount = 0;
-  let drawnCount = 0;
 
-  // Example set of tasks for now (replace with Supabase fetch later)
-  const tasks = [
-    { task: "Recite a mantra 33 times", category: "devotion", difficulty: "easy" },
-    { task: "Write a praise to Goddess KAREENA", category: "worship", difficulty: "medium" },
-    { task: "Spend 10 minutes in reflection on Her Feet", category: "humiliation", difficulty: "hard" }
-  ];
+  // Enable button if user is logged in
+  if (window.currentUser) getTaskBtn.disabled = false;
 
-  // Enable button once tasks are available
-  if (tasks.length > 0) {
-    getTaskBtn.disabled = false;
+  async function loadTodayTasks() {
+    if (!window.currentUser) return;
+
+    const today = new Date().toISOString().split("T")[0];
+    const { data, error } = await supabase
+      .from("rolled_tasks")
+      .select("*")
+      .eq("user_id", window.currentUser.id)
+      .eq("day_key", today);
+    if (error) return console.error(error);
+
+    taskList.innerHTML = "";
+    completedCount = 0;
+
+    data.forEach(task => {
+      const div = document.createElement("div");
+      div.className = "task";
+      div.innerText = task.text;
+
+      if (!task.done) {
+        const btn = document.createElement("button");
+        btn.innerText = "Complete";
+        btn.onclick = async () => {
+          await supabase.from("rolled_tasks")
+            .update({ done: true })
+            .eq("id", task.id)
+            .eq("user_id", window.currentUser.id);
+          loadTodayTasks();
+        };
+        div.appendChild(btn);
+      } else {
+        div.classList.add("done");
+        completedCount++;
+      }
+
+      taskList.appendChild(div);
+    });
+
+    taskCounter.innerText = `${completedCount}/5 tasks complete today`;
+    updateBegRelease(completedCount);
   }
 
-  // Handle "Get Task" click
-  getTaskBtn.addEventListener("click", () => {
-    if (drawnCount >= 5) {
-      alert("You’ve already drawn 5 tasks today.");
+  getTaskBtn.addEventListener("click", async () => {
+    if (!window.currentUser) return;
+
+    const today = new Date().toISOString().split("T")[0];
+
+    const { data: rolled, error: rolledErr } = await supabase
+      .from("rolled_tasks")
+      .select("text")
+      .eq("user_id", window.currentUser.id)
+      .eq("day_key", today);
+    if (rolledErr) return console.error(rolledErr);
+
+    const rolledTasks = rolled.map(r => r.text);
+
+    const { data: allTasks, error: allErr } = await supabase
+      .from("TaskLists")
+      .select("id, task");
+    if (allErr) return console.error(allErr);
+
+    const available = allTasks.filter(t => !rolledTasks.includes(t.task));
+    if (available.length === 0) {
+      alert("No more tasks available today!");
       return;
     }
 
-    const randomTask = tasks[Math.floor(Math.random() * tasks.length)];
+    const randomTask = available[Math.floor(Math.random() * available.length)];
 
-    const taskItem = document.createElement("div");
-    taskItem.className = "taskItem";
-    taskItem.innerHTML = `
-      <p>${randomTask.task} <em>(${randomTask.category}, ${randomTask.difficulty})</em></p>
-      <button class="completeBtn">Complete</button>
-    `;
-
-    const completeBtn = taskItem.querySelector(".completeBtn");
-    completeBtn.addEventListener("click", () => {
-      if (!taskItem.classList.contains("completed")) {
-        taskItem.classList.add("completed");
-        completeBtn.disabled = true;
-        completedCount++;
-        taskCounter.textContent = `${completedCount}/5 tasks complete today`;
-      }
+    await supabase.from("rolled_tasks").insert({
+      id: randomTask.id,
+      user_id: window.currentUser.id,
+      text: randomTask.task,
+      done: false,
+      day_key: today,
+      created_at: new Date()
     });
 
-    taskList.appendChild(taskItem);
-    drawnCount++;
+    loadTodayTasks();
   });
+
+  loadTodayTasks();
 }
