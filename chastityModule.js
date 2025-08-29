@@ -1,5 +1,5 @@
 // chastityModule.js
-export async function loadChastityModule() {
+export async function loadChastityModule(supabase) {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
 
@@ -7,104 +7,133 @@ export async function loadChastityModule() {
   chastityDiv.id = "chastityModule";
   chastityDiv.innerHTML = `
     <h2>Chastity Status</h2>
-    <p id="lockStatus">Loading...</p>
-    <p id="lockCountdown"></p>
+    <p id="chastityStatus">Loading...</p>
+    <button id="goddessLockBtn">Submit to Goddess KAREENA</button>
   `;
   modulesContainer.appendChild(chastityDiv);
 
-  const lockStatus = document.getElementById("lockStatus");
-  const lockCountdown = document.getElementById("lockCountdown");
+  const chastityStatus = document.getElementById("chastityStatus");
+  const goddessLockBtn = document.getElementById("goddessLockBtn");
 
-  // ---------------- Constants ----------------
-  const lockDurations = {
-    short: 1,      // 1-2 days
-    medium: 3,     // 3-5 days
-    long: 7,       // 1 week
-    extended: 14,  // 2 weeks
-  };
+  // Helper: Calculate release date
+  function calculateReleaseDate(lockType) {
+    const now = new Date();
+    let days = 0;
+    switch (lockType) {
+      case "short": days = 2; break;
+      case "medium": days = 5; break;
+      case "long": days = 7; break;
+      case "extended": days = 14; break;
+      case "custom": days = 21; break;
+    }
+    const release = new Date(now);
+    release.setDate(release.getDate() + days);
+    return release.toISOString();
+  }
 
-  const mandatedPeriods = [
-    {
-      name: "Goddess KAREENA's Birthday",
-      start: "2025-09-14", // 1 week lead-up
-      end: "2025-09-21",
-      lockType: "extended"
-    },
-    // Add more mandated periods here
-  ];
-
-  // ---------------- Functions ----------------
-  function daysBetween(date1, date2) {
-    const diffTime = date2 - date1;
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  // Helper: check for mandatory lock dates
+  function isMandatoryLock() {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const date = now.getDate();
+    // Example: lock 7 days before Her birthday (21 Sept)
+    if ((month === 9 && date >= 14 && date <= 21)) return true;
+    return false;
   }
 
   async function getChastityStatus() {
     if (!window.currentUser) return;
 
-    // Check database
     const { data, error } = await supabase
       .from("chastityStatus")
       .select("*")
       .eq("user_id", window.currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .single();
 
-    if (error) return console.error(error);
-
-    let status = data && data.length ? data[0] : null;
-
-    // Check mandated periods
-    const today = new Date();
-    for (let period of mandatedPeriods) {
-      const start = new Date(period.start);
-      const end = new Date(period.end);
-      if (today >= start && today <= end) {
-        status = {
-          is_locked: true,
-          release_date: end.toISOString(),
-          source: "Mandated by Goddess KAREENA"
-        };
-        break;
-      }
+    if (error) {
+      // If no record, create one
+      const { error: insertErr } = await supabase
+        .from("chastityStatus")
+        .insert({
+          user_id: window.currentUser.id,
+          is_locked: false,
+          release_date: null,
+          source: "init",
+          created_at: new Date(),
+          updated_at: new Date()
+        });
+      if (insertErr) return console.error(insertErr);
+      return getChastityStatus();
     }
 
-    if (!status) {
-      lockStatus.innerText = "You are not locked. Serve Goddess KAREENA faithfully!";
-      lockCountdown.innerText = "";
-      return;
-    }
-
-    // Update UI
-    lockStatus.innerText = status.is_locked
-      ? `You are locked! Release by ${new Date(status.release_date).toLocaleString()} (Source: ${status.source})`
-      : "You are not locked. Serve Goddess KAREENA faithfully!";
-
-    updateCountdown(new Date(status.release_date));
-  }
-
-  function updateCountdown(releaseDate) {
-    const interval = setInterval(() => {
+    let statusText = "";
+    if (data.is_locked) {
+      const release = new Date(data.release_date);
       const now = new Date();
-      const diff = releaseDate - now;
-
-      if (diff <= 0) {
-        clearInterval(interval);
-        lockStatus.innerText = "You are now free! Serve Goddess KAREENA well.";
-        lockCountdown.innerText = "";
-        return;
+      if (release > now) {
+        statusText = `You are locked in chastity until ${release.toLocaleString()}.`;
+      } else {
+        // Unlock automatically
+        await supabase
+          .from("chastityStatus")
+          .update({ is_locked: false, release_date: null, updated_at: new Date() })
+          .eq("user_id", window.currentUser.id);
+        statusText = "You are currently unlocked.";
       }
+    } else {
+      statusText = "You are currently unlocked.";
+    }
 
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff / (1000 * 60)) % 60);
-      const seconds = Math.floor((diff / 1000) % 60);
-      lockCountdown.innerText = `Time remaining: ${hours}h ${minutes}m ${seconds}s`;
-    }, 1000);
+    // Show mandatory lock message
+    if (isMandatoryLock()) {
+      statusText += " Goddess KAREENA mandates chastity now!";
+    }
+
+    chastityStatus.innerText = statusText;
   }
+
+  goddessLockBtn.addEventListener("click", async () => {
+    if (!window.currentUser) return;
+
+    // Determine lock type
+    let lockType = "short"; // default
+    if (isMandatoryLock()) lockType = "extended";
+    else {
+      const types = ["short","medium","long","extended","custom"];
+      lockType = types[Math.floor(Math.random()*types.length)];
+    }
+
+    const releaseDate = calculateReleaseDate(lockType);
+
+    // Update or insert record
+    const { data: existing, error } = await supabase
+      .from("chastityStatus")
+      .select("*")
+      .eq("user_id", window.currentUser.id)
+      .single();
+
+    if (error || !existing) {
+      await supabase.from("chastityStatus").insert({
+        user_id: window.currentUser.id,
+        is_locked: true,
+        release_date: releaseDate,
+        source: "goddessDecision",
+        created_at: new Date(),
+        updated_at: new Date()
+      });
+    } else {
+      await supabase.from("chastityStatus").update({
+        is_locked: true,
+        release_date: releaseDate,
+        source: "goddessDecision",
+        updated_at: new Date()
+      }).eq("user_id", window.currentUser.id);
+    }
+
+    await getChastityStatus();
+    alert(`Goddess KAREENA has locked you: ${lockType} lock until ${new Date(releaseDate).toLocaleString()}`);
+  });
 
   // Initial load
-  getChastityStatus();
-
-  // Refresh when user logs in
-  document.addEventListener("userLoggedIn", getChastityStatus);
+  await getChastityStatus();
 }
