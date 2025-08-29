@@ -13,29 +13,35 @@ export async function loadChastityModule(supabase) {
   `;
   modulesContainer.appendChild(chastityDiv);
 
-  const chastityStatus = document.getElementById("chastityStatus");
+  const statusP = document.getElementById("chastityStatus");
 
   async function getChastityStatus() {
     if (!window.currentUser) return;
-
     const { data, error } = await supabase
       .from("chastityStatus")
       .select("*")
       .eq("user_id", window.currentUser.id)
-      .single();
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    if (error || !data) {
-      chastityStatus.innerText = "You are currently unlocked.";
+    if (error) return console.error(error);
+
+    if (!data || data.length === 0) {
+      statusP.innerText = "You are not locked. Goddess has not dictated your chastity yet.";
       return;
     }
 
+    const latest = data[0];
     const now = new Date();
-    if (data.is_locked && new Date(data.release_date) > now) {
-      chastityStatus.innerText = `You are locked until ${new Date(data.release_date).toLocaleString()}`;
+    const releaseDate = new Date(latest.release_date);
+
+    if (latest.is_locked && releaseDate > now) {
+      statusP.innerText = `You are locked until ${releaseDate.toLocaleString()}. Source: ${latest.source}`;
     } else {
-      chastityStatus.innerText = "You are currently unlocked.";
+      statusP.innerText = "You are not locked. Goddess may decide soon.";
     }
   }
 
   await getChastityStatus();
+  setInterval(getChastityStatus, 60_000); // refresh every minute
 }
