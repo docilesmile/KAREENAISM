@@ -2,17 +2,36 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>KAREENAISM</title>
+  <title>KAREENAISM Task Spinner</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     body { font-family: Arial, sans-serif; padding: 20px; }
     button { margin: 5px; }
-    .module { margin-bottom: 30px; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+    .task { margin: 5px 0; }
+    .done { text-decoration: line-through; color: gray; }
   </style>
 </head>
 <body>
   <h1>Praise Goddess KAREENA!</h1>
-  <div id="modulesContainer">Loading Modules from Goddess KAREENA's will...</div>
+
+  <!-- Login -->
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <button id="login">Login</button>
+  <button id="logout" style="display:none;">Logout</button>
+
+  <hr>
+
+  <!-- Placeholder for modules -->
+  <div id="modulesContainer">
+    Loading Modules from Goddess KAREENA's will...
+  </div>
+
+  <hr>
+
+  <!-- Release -->
+  <button id="begRelease" disabled>Beg for Release</button>
+  <p id="releaseOutput"></p>
 
   <script>
     // ---------------- Supabase Init ----------------
@@ -21,43 +40,117 @@
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"
     );
 
-    // ---------------- Load Modules ----------------
-    async function loadModules() {
-      const { data: modules, error } = await supabase
-        .from("modules")
-        .select("*")
-        .order("id");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const loginBtn = document.getElementById("login");
+    const logoutBtn = document.getElementById("logout");
+    const begReleaseBtn = document.getElementById("begRelease");
+    const releaseOutput = document.getElementById("releaseOutput");
 
-      if (error) {
-        console.error(error);
-        document.getElementById("modulesContainer").innerText = "Error loading modules.";
-        return;
-      }
+    let currentUser = null;
+    window.currentUser = null; // Make it global for modules
 
-      const container = document.getElementById("modulesContainer");
-      container.innerHTML = ""; // clear loading text
-
-      modules.forEach(module => {
-        const moduleDiv = document.createElement("div");
-        moduleDiv.className = "module";
-        moduleDiv.id = `module-${module.id}`;
-        moduleDiv.innerHTML = `<h2>${module.title}</h2>${module.content}`;
-        container.appendChild(moduleDiv);
-
-        // Dynamically load JS file for module type
-        if (module.type) {
-          const script = document.createElement("script");
-          script.src = `${module.type}Module.js`; // e.g., "tasksModule.js"
-          script.defer = true;
-          document.body.appendChild(script);
-        }
+    // ---------------- Auth ----------------
+    loginBtn.addEventListener("click", async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.value,
+        password: passwordInput.value,
       });
+      if (error) return alert(error.message);
+
+      currentUser = data.user;
+      window.currentUser = currentUser; // Make available globally
+      console.log("✅ Logged in:", currentUser.email);
+
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
+
+      // Load the task module dynamically
+      import('./tasksModule.js').then(module => {
+        module.loadTasksModule();
+      });
+
+      // Load release module (optional, can modularize later)
+      checkReleaseDecision();
+    });
+
+    logoutBtn.addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      currentUser = null;
+      window.currentUser = null;
+
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
+
+      // Clear modules and release
+      document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
+      begReleaseBtn.disabled = true;
+      releaseOutput.innerText = "";
+    });
+
+    // ---------------- Release ----------------
+    async function checkReleaseDecision() {
+      if (!currentUser) return;
+
+      const today = new Date().toISOString().split("T")[0];
+      const { data: pendingDecisions, error } = await supabase
+        .from("release_decisions")
+        .select("*")
+        .eq("user_id", currentUser.id)
+        .eq("day_key", today)
+        .eq("status", "pending");
+
+      if (error) return console.error(error);
+
+      if (pendingDecisions.length > 0) {
+        const decision = pendingDecisions[0];
+        if (new Date(decision.reveal_at) <= new Date()) {
+          await supabase
+            .from("release_decisions")
+            .update({ status: "revealed" })
+            .eq("id", decision.id);
+          releaseOutput.innerText = `Goddess KAREENA says: ${decision.outcome}`;
+        } else {
+          releaseOutput.innerText = "Goddess KAREENA is deciding your fate...";
+        }
+      }
     }
 
-    loadModules();
+    begReleaseBtn.addEventListener("click", async () => {
+      if (!currentUser) return;
+
+      const { data: options, error } = await supabase
+        .from("releaseOptions")
+        .select("*");
+      if (error) return console.error(error);
+
+      const randomOption = options[Math.floor(Math.random() * options.length)];
+
+      const delayMs = Math.floor(Math.random() * 30 * 60 * 1000) + 30000;
+      const revealAt = new Date(Date.now() + delayMs).toISOString();
+      const today = new Date().toISOString().split("T")[0];
+
+      const { error: insertErr } = await supabase
+        .from("release_decisions")
+        .insert({
+          id: randomOption.id,
+          user_id: currentUser.id,
+          status: "pending",
+          outcome: randomOption.decision,
+          reveal_at: revealAt,
+          day_key: today,
+          created_at: new Date()
+        });
+      if (insertErr) return console.error(insertErr);
+
+      releaseOutput.innerText = "Goddess KAREENA is deciding your fate...";
+      begReleaseBtn.disabled = true;
+
+      setTimeout(checkReleaseDecision, delayMs + 1000);
+    });
   </script>
-  <script src="tasksModule.js"></script>
+
+  <!-- Load the tasks module as a separate JS file -->
+  <script type="module" src="tasksModule.js"></script>
 </body>
 </html>
-
-
