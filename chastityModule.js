@@ -87,16 +87,26 @@ Total added: ${latest.total_added || 0} minutes
   // ---------------- Apply penalties for incomplete tasks at 2AM ----------------
   window.applyIncompleteTaskPenalties = async function(supabase) {
     if (!window.currentUser) return;
+
     const today = new Date().toISOString().split("T")[0];
+    console.log("Fetching incomplete tasks for today:", today);
 
     const { data, error } = await supabase
       .from("rolled_tasks")
       .select("*")
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today)
-      .eq("done", false);
+      .eq("done", false); // Only fetch incomplete tasks
 
-    if (error) return console.error(error);
+    if (error) {
+      console.error("Error fetching incomplete tasks:", error);
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      console.log("No incomplete tasks found.");
+      return;
+    }
 
     let totalPenalty = 0;
     data.forEach(task => {
@@ -104,6 +114,8 @@ Total added: ${latest.total_added || 0} minutes
       else if (task.difficulty === "Medium") totalPenalty += 60;
       else if (task.difficulty === "Hard") totalPenalty += 180;
     });
+
+    console.log(`Total penalty for incomplete tasks: ${totalPenalty} minutes`);
 
     if (totalPenalty > 0) {
       const { data: latestData, error: statusErr } = await supabase
@@ -113,7 +125,10 @@ Total added: ${latest.total_added || 0} minutes
         .order("created_at", { ascending: false })
         .limit(1);
 
-      if (statusErr || !latestData || latestData.length === 0) return;
+      if (statusErr || !latestData || latestData.length === 0) {
+        console.error("Error fetching chastity status:", statusErr);
+        return;
+      }
 
       const latest = latestData[0];
       const newRelease = new Date(new Date(latest.release_date).getTime() + totalPenalty * 60 * 1000);
@@ -126,6 +141,7 @@ Total added: ${latest.total_added || 0} minutes
         })
         .eq("id", latest.id);
 
+      console.log(`Chastity release date extended by ${totalPenalty} minutes.`);
       getChastityStatus();
     }
   };
@@ -142,60 +158,9 @@ Total added: ${latest.total_added || 0} minutes
       schedulePenaltyCheck(); // next day
     }, delay);
   }
+
+  // Start penalty checks at 2 AM
   schedulePenaltyCheck();
-
-  // ---------------- Beg for Release ----------------
-  window.attemptBegRelease = async function(supabase, outputElement) {
-    if (!window.currentUser) return;
-
-    const { data: statusData, error: statusErr } = await supabase
-      .from("chastityStatus")
-      .select("*")
-      .eq("user_id", window.currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    if (statusErr || !statusData || statusData.length === 0) return;
-
-    const latest = statusData[0];
-    const now = new Date();
-
-    if (latest.is_locked && new Date(latest.release_date) > now) {
-      const mercyRoll = Math.random() * 100;
-      if (mercyRoll <= 5) {
-        await supabase
-          .from("chastityStatus")
-          .update({ is_locked: false, release_date: now, source: "Goddess KAREENA's mercy" })
-          .eq("id", latest.id);
-        outputElement.innerText = "Goddess KAREENA has taken pity on you and grants early release… Praise Her!";
-      } else {
-        const extraDays = Math.floor(Math.random() * 2) + 1;
-        const newReleaseDate = new Date(latest.release_date);
-        newReleaseDate.setDate(newReleaseDate.getDate() + extraDays);
-
-        await supabase
-          .from("chastityStatus")
-          .update({
-            release_date: newReleaseDate,
-            source: "Goddess KAREENA adds time as punishment",
-            total_added: (latest.total_added || 0) + (extraDays * 24 * 60)
-          })
-          .eq("id", latest.id);
-
-        outputElement.innerText = `Goddess KAREENA refuses your plea. She extends your chastity by ${extraDays} day(s) and may add extra tasks.`;
-      }
-    } else {
-      const { data: options, error } = await supabase
-        .from("releaseOptions")
-        .select("*");
-      if (error) return console.error(error);
-
-      const randomOption = options[Math.floor(Math.random() * options.length)];
-      outputElement.innerText = `Goddess KAREENA says: ${randomOption.decision}`;
-    }
-
-    getChastityStatus();
-  };
 
   await getChastityStatus();
   setInterval(getChastityStatus, 60_000); // refresh every minute
