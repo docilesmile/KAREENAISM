@@ -15,7 +15,6 @@ export async function loadChastityModule(supabase) {
 
   const statusP = document.getElementById("chastityStatus");
 
-  // ---------------- Helper: get latest chastity status ----------------
   async function getChastityStatus() {
     if (!window.currentUser) return;
 
@@ -23,10 +22,13 @@ export async function loadChastityModule(supabase) {
       .from("chastityStatus")
       .select("*")
       .eq("user_id", window.currentUser.id)
-      .order('created_at', { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(1);
 
-    if (error) return console.error(error);
+    if (error) {
+      console.error("Error fetching chastity status:", error);
+      return;
+    }
     if (!data || data.length === 0) {
       statusP.innerText = "You are not locked. Goddess has not dictated your chastity yet.";
       return;
@@ -41,7 +43,7 @@ export async function loadChastityModule(supabase) {
       const remaining = {
         days: Math.floor(remainingMs / (1000 * 60 * 60 * 24)),
         hours: Math.floor((remainingMs / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((remainingMs / (1000 * 60)) % 60)
+        minutes: Math.floor((remainingMs / (1000 * 60)) % 60),
       };
 
       statusP.innerText = `
@@ -56,8 +58,8 @@ Total added: ${latest.total_added || 0} minutes
     }
   }
 
-  // ---------------- Reduce chastity time by minutes ----------------
-  window.reduceTimeForTask = async function(minutes) {
+  // Reduce chastity time
+  window.reduceTimeForTask = async function (minutes) {
     if (!window.currentUser) return;
 
     const { data, error } = await supabase
@@ -67,7 +69,10 @@ Total added: ${latest.total_added || 0} minutes
       .order("created_at", { ascending: false })
       .limit(1);
 
-    if (error || !data || data.length === 0) return;
+    if (error || !data || data.length === 0) {
+      console.error("Error fetching chastity status for reduction:", error);
+      return;
+    }
     const latest = data[0];
     if (!latest.is_locked) return;
 
@@ -77,36 +82,31 @@ Total added: ${latest.total_added || 0} minutes
       .from("chastityStatus")
       .update({
         release_date: newRelease,
-        total_reduced: (latest.total_reduced || 0) + minutes
+        total_reduced: (latest.total_reduced || 0) + minutes,
       })
       .eq("id", latest.id);
 
     getChastityStatus();
   };
 
-  // ---------------- Apply penalties for incomplete tasks at 2AM ----------------
-  window.applyIncompleteTaskPenalties = async function(supabase) {
+  // Penalty check at 2AM
+  window.applyIncompleteTaskPenalties = async function (supabase) {
     if (!window.currentUser) return;
 
     const today = new Date().toISOString().split("T")[0];
-    console.log("Fetching incomplete tasks for today:", today);
-
     const { data, error } = await supabase
       .from("rolled_tasks")
       .select("*")
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today)
-      .eq("done", false); // Only fetch incomplete tasks
+      .eq("done", false);
 
     if (error) {
       console.error("Error fetching incomplete tasks:", error);
       return;
     }
 
-    if (!data || data.length === 0) {
-      console.log("No incomplete tasks found.");
-      return;
-    }
+    if (!data || data.length === 0) return;
 
     let totalPenalty = 0;
     data.forEach(task => {
@@ -114,8 +114,6 @@ Total added: ${latest.total_added || 0} minutes
       else if (task.difficulty === "Medium") totalPenalty += 60;
       else if (task.difficulty === "Hard") totalPenalty += 180;
     });
-
-    console.log(`Total penalty for incomplete tasks: ${totalPenalty} minutes`);
 
     if (totalPenalty > 0) {
       const { data: latestData, error: statusErr } = await supabase
@@ -126,7 +124,7 @@ Total added: ${latest.total_added || 0} minutes
         .limit(1);
 
       if (statusErr || !latestData || latestData.length === 0) {
-        console.error("Error fetching chastity status:", statusErr);
+        console.error("Error fetching chastity status for penalty:", statusErr);
         return;
       }
 
@@ -137,7 +135,7 @@ Total added: ${latest.total_added || 0} minutes
         .from("chastityStatus")
         .update({
           release_date: newRelease,
-          total_added: (latest.total_added || 0) + totalPenalty
+          total_added: (latest.total_added || 0) + totalPenalty,
         })
         .eq("id", latest.id);
 
@@ -146,7 +144,6 @@ Total added: ${latest.total_added || 0} minutes
     }
   };
 
-  // ---------------- Schedule 2AM penalties ----------------
   function schedulePenaltyCheck() {
     const now = new Date();
     const next2AM = new Date();
@@ -155,11 +152,10 @@ Total added: ${latest.total_added || 0} minutes
     const delay = next2AM - now;
     setTimeout(async () => {
       if (window.applyIncompleteTaskPenalties) await window.applyIncompleteTaskPenalties(supabase);
-      schedulePenaltyCheck(); // next day
+      schedulePenaltyCheck();
     }, delay);
   }
 
-  // Start penalty checks at 2 AM
   schedulePenaltyCheck();
 
   await getChastityStatus();
