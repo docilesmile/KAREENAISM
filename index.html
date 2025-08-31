@@ -1,25 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>KAREENAISM Task Spinner</title>
-  <script type="module" src="taskModule.js"></script>
-  <script type="module" src="chastityModule.js"></script>
+<meta charset="UTF-8">
+<title>KAREENAISM Task Spinner</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body { font-family: Arial, sans-serif; padding: 20px; }
+button { margin: 5px; }
+.task { margin: 5px 0; }
+.done { text-decoration: line-through; color: gray; }
+</style>
 </head>
 <body>
-  <h1>Praise Goddess KAREENA!</h1>
-  <button id="rollBtn">Get Task</button>
-  <button id="rerollBtn">Reroll Task (Forfeit)</button>
-  <div id="modulesContainer">Loading tasks...</div>
+<h1>Praise Goddess KAREENA!</h1>
 
-  <script type="module">
-    import { loadTasksModule, dailyReset } from './taskModule.js';
-    import { lockChastity } from './chastityModule.js';
+<!-- Login -->
+<form id="loginForm" onsubmit="return false;">
+<input type="email" id="email" placeholder="Email" autocomplete="username">
+<input type="password" id="password" placeholder="Password" autocomplete="current-password">
+<button id="login">Login</button>
+</form>
+<button id="logout" style="display:none;">Logout</button>
 
-    const userId = "<YOUR_USER_ID>"; // replace with Supabase user ID
+<hr>
 
-    loadTasksModule(userId);
-    dailyReset(userId); // apply any penalties if needed
-  </script>
+<!-- Modules -->
+<div id="modulesContainer">Loading Modules from Goddess KAREENA's will...</div>
+
+<hr>
+
+<!-- Beg Release -->
+<button id="begRelease" disabled>Beg for Release</button>
+<p id="releaseOutput"></p>
+
+<script type="module">
+const supabase = window.supabase.createClient(
+  "https://djdhtdrseqfaiskvbvhb.supabase.co",
+  "<YOUR_SUPABASE_ANON_KEY>"
+);
+
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+const loginBtn = document.getElementById("login");
+const logoutBtn = document.getElementById("logout");
+const begReleaseBtn = document.getElementById("begRelease");
+const releaseOutput = document.getElementById("releaseOutput");
+
+let currentUser = null;
+window.currentUser = null;
+
+loginBtn.addEventListener("click", async () => {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: emailInput.value,
+    password: passwordInput.value
+  });
+  if (error) return alert(error.message);
+
+  currentUser = data.user;
+  window.currentUser = currentUser;
+
+  loginBtn.style.display = "none";
+  logoutBtn.style.display = "inline-block";
+
+  // Load Modules
+  const { loadTasksModule } = await import('./tasksModule.js');
+  loadTasksModule(supabase, updateBegRelease);
+
+  const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
+  await loadChastityModule(supabase);
+
+  window.reduceTimeForTask = reduceTimeForTask;
+  window.attemptBegRelease = attemptBegRelease;
+});
+
+logoutBtn.addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  currentUser = null;
+  window.currentUser = null;
+
+  loginBtn.style.display = "inline-block";
+  logoutBtn.style.display = "none";
+
+  document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
+  begReleaseBtn.disabled = true;
+  releaseOutput.innerText = "";
+});
+
+begReleaseBtn.addEventListener("click", async () => {
+  if (!window.currentUser || !window.attemptBegRelease) return;
+  await window.attemptBegRelease(supabase, releaseOutput);
+  begReleaseBtn.disabled = true;
+});
+
+function updateBegRelease(completedTasks) {
+  begReleaseBtn.disabled = completedTasks < 5;
+}
+</script>
 </body>
 </html>
