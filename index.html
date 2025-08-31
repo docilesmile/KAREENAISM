@@ -62,9 +62,9 @@ loginBtn.addEventListener("click", async () => {
   loginBtn.style.display = "none";
   logoutBtn.style.display = "inline-block";
 
-  // Load Holy Day Status Module first (top of page)
+  // Load Holy Day Status Module
   const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
-  loadHolyDayStatusModule(supabase);
+  loadHolyDayStatusModule();
 
   // Load Tasks Module
   const { loadTasksModule } = await import('./tasksModule.js');
