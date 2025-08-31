@@ -3,109 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <title>KAREENAISM Task Spinner</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    button { margin: 5px; }
-    .task { margin: 5px 0; }
-    .done { text-decoration: line-through; color: gray; }
-  </style>
+  <script type="module" src="taskModule.js"></script>
+  <script type="module" src="chastityModule.js"></script>
 </head>
 <body>
   <h1>Praise Goddess KAREENA!</h1>
-
-  <!-- Login -->
-  <form id="loginForm" onsubmit="return false;">
-    <input type="email" id="email" placeholder="Email" autocomplete="username">
-    <input type="password" id="password" placeholder="Password" autocomplete="current-password">
-    <button id="login">Login</button>
-  </form>
-  <button id="logout" style="display:none;">Logout</button>
-
-  <hr>
-
-  <!-- Modules -->
-  <div id="modulesContainer">
-    Loading Modules from Goddess KAREENA's will...
-  </div>
-
-  <hr>
-
-  <!-- Release -->
-  <button id="begRelease" disabled>Beg for Release</button>
-  <p id="releaseOutput"></p>
+  <button id="rollBtn">Get Task</button>
+  <button id="rerollBtn">Reroll Task (Forfeit)</button>
+  <div id="modulesContainer">Loading tasks...</div>
 
   <script type="module">
-    // ---------------- Supabase Init ----------------
-    const supabase = window.supabase.createClient(
-      "https://djdhtdrseqfaiskvbvhb.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"
-    );
+    import { loadTasksModule, dailyReset } from './taskModule.js';
+    import { lockChastity } from './chastityModule.js';
 
-    const emailInput = document.getElementById("email");
-    const passwordInput = document.getElementById("password");
-    const loginBtn = document.getElementById("login");
-    const logoutBtn = document.getElementById("logout");
-    const begReleaseBtn = document.getElementById("begRelease");
-    const releaseOutput = document.getElementById("releaseOutput");
+    const userId = "<YOUR_USER_ID>"; // replace with Supabase user ID
 
-    let currentUser = null;
-    window.currentUser = null;
-
-    // ---------------- Auth ----------------
-    loginBtn.addEventListener("click", async () => {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: emailInput.value,
-        password: passwordInput.value,
-      });
-      if (error) {
-        console.error("Login error:", error);
-        return alert(error.message);
-      }
-
-      currentUser = data.user;
-      window.currentUser = currentUser;
-
-      loginBtn.style.display = "none";
-      logoutBtn.style.display = "inline-block";
-
-      // Load Tasks Module
-      const { loadTasksModule } = await import('/KAREENAISM/tasksModule.js');
-      loadTasksModule(supabase, updateBegRelease);
-
-      // Load Chastity Module
-      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('/KAREENAISM/chastityModule.js');
-      await loadChastityModule(supabase);
-
-      // Make these globally available
-      window.reduceTimeForTask = reduceTimeForTask;
-      window.attemptBegRelease = attemptBegRelease;
-    });
-
-    logoutBtn.addEventListener("click", async () => {
-      await supabase.auth.signOut();
-      currentUser = null;
-      window.currentUser = null;
-
-      loginBtn.style.display = "inline-block";
-      logoutBtn.style.display = "none";
-
-      document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
-      begReleaseBtn.disabled = true;
-      releaseOutput.innerText = "";
-    });
-
-    // ---------------- Release ----------------
-    begReleaseBtn.addEventListener("click", async () => {
-      if (!window.currentUser || !window.attemptBegRelease) return;
-      await window.attemptBegRelease(supabase, releaseOutput);
-      begReleaseBtn.disabled = true;
-    });
-
-    // Enable Beg Release after 5 tasks
-    function updateBegRelease(completedTasks) {
-      begReleaseBtn.disabled = completedTasks < 5;
-    }
+    loadTasksModule(userId);
+    dailyReset(userId); // apply any penalties if needed
   </script>
 </body>
 </html>
