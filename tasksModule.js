@@ -1,5 +1,9 @@
+// tasksModule.js
 export async function loadTasksModule(supabase, updateBegRelease) {
+  if (!supabase) throw new Error("Supabase client must be passed into tasksModule");
   const modulesContainer = document.getElementById("modulesContainer");
+  if (!modulesContainer) return;
+
   const taskModuleDiv = document.createElement("div");
   taskModuleDiv.id = "tasksModule";
   taskModuleDiv.innerHTML = `
@@ -16,11 +20,13 @@ export async function loadTasksModule(supabase, updateBegRelease) {
 
   let completedCount = 0;
 
-  const enableTaskButton = () => { if(window.currentUser) getTaskBtn.disabled = false; };
+  const enableTaskButton = () => {
+    if (window.currentUser) getTaskBtn.disabled = false;
+  };
   enableTaskButton();
 
   async function loadTodayTasks() {
-    if(!window.currentUser) return;
+    if (!window.currentUser) return;
     const today = new Date().toISOString().split("T")[0];
 
     const { data, error } = await supabase
@@ -29,7 +35,18 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today);
 
-    if(error) return console.error(error);
+    if (error) {
+      console.error(error);
+      taskList.innerHTML = "Error loading tasks. Please refresh.";
+      return;
+    }
+
+    if (!data || data.length === 0) {
+      taskList.innerHTML = "No tasks rolled yet today.";
+      taskCounter.innerText = `0/5 tasks complete today`;
+      return;
+    }
+
     taskList.innerHTML = "";
     completedCount = 0;
 
@@ -38,88 +55,91 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       div.className = "task";
       div.innerText = `${task.text} [${task.difficulty || "Easy"}]`;
 
-      if(!task.done) {
+      if (!task.done) {
         const btn = document.createElement("button");
         btn.innerText = "Complete";
-        btn.onclick = async () => { await markTaskComplete(task.id, task.difficulty); };
-        const rerollBtn = document.createElement("button");
-        rerollBtn.innerText = "Reroll";
-        rerollBtn.onclick = async () => { await rerollTask(task.id); };
+        btn.onclick = async () => {
+          await markTaskComplete(task.id, task.difficulty);
+        };
         div.appendChild(btn);
-        div.appendChild(rerollBtn);
       } else {
         div.classList.add("done");
         completedCount++;
       }
-
       taskList.appendChild(div);
     });
 
     taskCounter.innerText = `${completedCount}/5 tasks complete today`;
-    if(updateBegRelease) updateBegRelease(completedCount);
+    if (updateBegRelease) updateBegRelease(completedCount);
   }
 
   async function markTaskComplete(taskId, difficulty) {
-    if(!window.currentUser) return;
+    if (!window.currentUser) return;
 
-    await supabase.from("rolled_tasks").update({ done:true }).eq("id", taskId);
-    if(window.reduceTimeForTask) {
-      let minutes = 0;
-      if(difficulty === "Easy") minutes=60;
-      else if(difficulty==="Medium") minutes=120;
-      else if(difficulty==="Hard") minutes=300;
+    // Mark task as done in DB
+    const { error } = await supabase
+      .from("rolled_tasks")
+      .update({ done: true })
+      .eq("id", taskId)
+      .eq("user_id", window.currentUser.id);
+
+    if (error) return console.error(error);
+
+    // Reduce chastity time
+    let minutes = 0;
+    if (difficulty === "Easy") minutes = 60;
+    else if (difficulty === "Medium") minutes = 120;
+    else if (difficulty === "Hard") minutes = 300;
+    else minutes = 60; // default
+
+    if (window.reduceTimeForTask) {
       await window.reduceTimeForTask(minutes);
     }
 
     loadTodayTasks();
   }
 
-  async function rerollTask(taskId) {
+  getTaskBtn.addEventListener("click", async () => {
+    if (!window.currentUser) return;
     const today = new Date().toISOString().split("T")[0];
 
-    const { data: allTasks } = await supabase.from("TaskLists").select("*");
-    if(!allTasks) return;
+    // fetch today's rolled tasks
+    const { data: rolled, error: rolledErr } = await supabase
+      .from("rolled_tasks")
+      .select("text")
+      .eq("user_id", window.currentUser.id)
+      .eq("day_key", today);
 
-    // pick two random tasks for forfeit
-    const shuffled = allTasks.sort(()=>0.5-Math.random()).slice(0,2);
-    for(const t of shuffled) {
-      await supabase.from("rolled_tasks").insert({
+    if (rolledErr) return console.error(rolledErr);
+    const rolledTasks = rolled?.map(r => r.text) || [];
+
+    // fetch all tasks
+    const { data: allTasks, error: allErr } = await supabase
+      .from("TaskLists")
+      .select("id, task, difficulty");
+
+    if (allErr) return console.error(allErr);
+
+    // pick random unrolled task
+    const available = allTasks.filter(t => !rolledTasks.includes(t.task));
+    if (available.length === 0) {
+      alert("No more tasks available today!");
+      return;
+    }
+    const randomTask = available[Math.floor(Math.random() * available.length)];
+
+    const { error: insertErr } = await supabase
+      .from("rolled_tasks")
+      .insert({
         user_id: window.currentUser.id,
-        text: t.task,
-        done:false,
-        difficulty: t.difficulty || "Easy",
+        text: randomTask.task,
+        done: false,
+        difficulty: randomTask.difficulty || "Easy",
         day_key: today,
         created_at: new Date()
       });
-    }
 
-    // remove old task
-    await supabase.from("rolled_tasks").delete().eq("id", taskId);
-
-    loadTodayTasks();
-  }
-
-  getTaskBtn.addEventListener("click", async () => {
-    if(!window.currentUser) return;
-    const today = new Date().toISOString().split("T")[0];
-
-    const { data: rolled } = await supabase.from("rolled_tasks").select("text").eq("user_id", window.currentUser.id).eq("day_key", today);
-    const rolledTasks = rolled.map(r=>r.text);
-
-    const { data: allTasks } = await supabase.from("TaskLists").select("*");
-    const available = allTasks.filter(t=>!rolledTasks.includes(t.task));
-    if(available.length===0){ alert("No more tasks available today!"); return; }
-
-    const randomTask = available[Math.floor(Math.random()*available.length)];
-    await supabase.from("rolled_tasks").insert({
-      user_id: window.currentUser.id,
-      text: randomTask.task,
-      done:false,
-      difficulty: randomTask.difficulty || "Easy",
-      day_key: today,
-      created_at: new Date()
-    });
-
+    if (insertErr) return console.error(insertErr);
     loadTodayTasks();
   });
 
