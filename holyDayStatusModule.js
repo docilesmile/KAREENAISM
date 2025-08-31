@@ -1,74 +1,35 @@
 // holyDayStatusModule.js
 export async function loadHolyDayStatusModule(supabase) {
   const modulesContainer = document.getElementById("modulesContainer");
+  if (!modulesContainer) return;
+
   const holyDiv = document.createElement("div");
   holyDiv.id = "holyDayStatusModule";
-  holyDiv.innerHTML = `
-    <h2>Goddess KAREENA Status</h2>
-    <p id="currentLockStatus">Loading lock status...</p>
-    <p id="timeRemaining"></p>
-    <h3>Upcoming Holy Days</h3>
-    <ul id="holyDayList">Loading...</ul>
-  `;
+  holyDiv.innerHTML = `<h2>Upcoming Holy Days</h2><div id="holyDayList">Loading...</div>`;
   modulesContainer.appendChild(holyDiv);
 
-  const currentLockStatus = document.getElementById("currentLockStatus");
-  const timeRemaining = document.getElementById("timeRemaining");
   const holyDayList = document.getElementById("holyDayList");
 
-  const HOLY_DAYS = [
-    { name: "Goddess KAREENA Birthday", month: 9, day: 21 },
-    ...Array.from({ length: 7 }, (_, i) => ({ name: `Birthday Week`, month: 9, day: 14 + i }))
-  ];
+  const today = new Date();
+  const birthday = new Date(today.getFullYear(), 8, 21); // 21 Sep
 
-  async function updateStatus() {
-    if (!window.currentUser) return;
-
-    // Fetch latest chastity status
-    const { data } = await supabase.from("chastityStatus")
-      .select("*")
-      .eq("user_id", window.currentUser.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
-
-    let statusText = "You are not locked.";
-    let remainingText = "";
-    if (data && data.length > 0) {
-      const latest = data[0];
-      if (latest.is_locked) {
-        const now = new Date();
-        const release = new Date(latest.release_date);
-        const diffMs = release - now;
-        const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        const hours = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
-        const minutes = Math.floor((diffMs / (1000 * 60)) % 60);
-        statusText = `Locked by Goddess KAREENA until ${release.toLocaleString()} (Source: ${latest.source || "Her will"})`;
-        remainingText = `Time remaining: ${days}d ${hours}h ${minutes}m`;
-      }
-    }
-    currentLockStatus.innerText = statusText;
-    timeRemaining.innerText = remainingText;
-
-    // Upcoming Holy Days
-    const today = new Date();
-    const upcoming = HOLY_DAYS
-      .map(d => {
-        const year = today.getMonth() > d.month-1 || (today.getMonth() === d.month-1 && today.getDate() > d.day) ? today.getFullYear()+1 : today.getFullYear();
-        const date = new Date(year, d.month - 1, d.day);
-        const diffMs = date - today;
-        const daysUntil = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-        return { ...d, date, daysUntil };
-      })
-      .sort((a, b) => a.daysUntil - b.daysUntil);
-
-    holyDayList.innerHTML = "";
-    upcoming.forEach(h => {
-      const li = document.createElement("li");
-      li.innerText = `${h.name} on ${h.date.toLocaleDateString()} (in ${h.daysUntil} days)`;
-      holyDayList.appendChild(li);
-    });
+  const birthdayWeek = [];
+  for (let i = -7; i <= 0; i++) {
+    const d = new Date(birthday);
+    d.setDate(d.getDate() + i);
+    birthdayWeek.push(d);
   }
 
-  await updateStatus();
-  setInterval(updateStatus, 60_000); // refresh every minute
+  function formatDate(d) {
+    return d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  }
+
+  const daysUntil = d => Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+
+  let html = `<ul>`;
+  html += `<li>Birthday Week (${formatDate(birthdayWeek[0])} - ${formatDate(birthdayWeek[birthdayWeek.length - 1])}) (in ${daysUntil(birthdayWeek[0])} days)</li>`;
+  html += `<li>Goddess KAREENA Birthday on ${formatDate(birthday)} (in ${daysUntil(birthday)} days)</li>`;
+  html += `</ul>`;
+
+  holyDayList.innerHTML = html;
 }
