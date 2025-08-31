@@ -24,7 +24,7 @@
 
   <hr>
 
-  <!-- Placeholder for modules -->
+  <!-- Modules -->
   <div id="modulesContainer">
     Loading Modules from Goddess KAREENA's will...
   </div>
@@ -58,7 +58,10 @@
         email: emailInput.value,
         password: passwordInput.value,
       });
-      if (error) return alert(error.message);
+      if (error) {
+        console.error("Login error:", error);
+        return alert(error.message);
+      }
 
       currentUser = data.user;
       window.currentUser = currentUser;
@@ -74,7 +77,7 @@
       const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('/KAREENAISM/chastityModule.js');
       await loadChastityModule(supabase);
 
-      // Make these globally available for tasks module
+      // Make these globally available
       window.reduceTimeForTask = reduceTimeForTask;
       window.attemptBegRelease = attemptBegRelease;
     });
@@ -99,7 +102,7 @@
       begReleaseBtn.disabled = true;
     });
 
-    // Function to enable Beg Release after 5 tasks
+    // Enable Beg Release after 5 tasks
     function updateBegRelease(completedTasks) {
       begReleaseBtn.disabled = completedTasks < 5;
     }
