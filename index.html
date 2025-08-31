@@ -24,7 +24,7 @@ button { margin: 5px; }
 
 <hr>
 
-<!-- Modules -->
+<!-- Modules Container -->
 <div id="modulesContainer">Loading Modules from Goddess KAREENA's will...</div>
 
 <hr>
@@ -36,7 +36,7 @@ button { margin: 5px; }
 <script type="module">
 const supabase = window.supabase.createClient(
   "https://djdhtdrseqfaiskvbvhb.supabase.co",
-  "<YOUR_SUPABASE_ANON_KEY>"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"
 );
 
 const emailInput = document.getElementById("email");
@@ -62,13 +62,19 @@ loginBtn.addEventListener("click", async () => {
   loginBtn.style.display = "none";
   logoutBtn.style.display = "inline-block";
 
-  // Load Modules
+  // Load Holy Day Status Module first (top of page)
+  const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
+  loadHolyDayStatusModule(supabase);
+
+  // Load Tasks Module
   const { loadTasksModule } = await import('./tasksModule.js');
   loadTasksModule(supabase, updateBegRelease);
 
+  // Load Chastity Module
   const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
   await loadChastityModule(supabase);
 
+  // Make globals available
   window.reduceTimeForTask = reduceTimeForTask;
   window.attemptBegRelease = attemptBegRelease;
 });
