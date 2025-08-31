@@ -36,7 +36,10 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today);
 
-    if (error) return console.error(error);
+    if (error) {
+      console.error("Error loading today’s tasks:", error);
+      return;
+    }
 
     taskList.innerHTML = "";
     completedCount = 0;
@@ -67,16 +70,18 @@ export async function loadTasksModule(supabase, updateBegRelease) {
   async function markTaskComplete(taskId, difficulty) {
     if (!window.currentUser) return;
 
-    // Mark task as done in DB
     const { error } = await supabase
       .from("rolled_tasks")
       .update({ done: true })
       .eq("id", taskId)
       .eq("user_id", window.currentUser.id);
 
-    if (error) return console.error(error);
+    if (error) {
+      console.error("Error marking task complete:", error);
+      return;
+    }
 
-    // ---------------- Reduce chastity time ----------------
+    // Reduce chastity time
     let minutes = 0;
     if (difficulty === "Easy") minutes = 30;
     else if (difficulty === "Medium") minutes = 60;
@@ -93,29 +98,33 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (!window.currentUser) return;
     const today = new Date().toISOString().split("T")[0];
 
-    // fetch today's rolled tasks
     const { data: rolled, error: rolledErr } = await supabase
       .from("rolled_tasks")
       .select("text")
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today);
 
-    if (rolledErr) return console.error(rolledErr);
+    if (rolledErr) {
+      console.error("Error fetching rolled tasks:", rolledErr);
+      return;
+    }
     const rolledTasks = rolled.map(r => r.text);
 
-    // fetch all tasks
     const { data: allTasks, error: allErr } = await supabase
       .from("TaskLists")
       .select("id, task, difficulty");
 
-    if (allErr) return console.error(allErr);
+    if (allErr) {
+      console.error("Error fetching TaskLists:", allErr);
+      return;
+    }
 
-    // pick random unrolled task
     const available = allTasks.filter(t => !rolledTasks.includes(t.task));
     if (available.length === 0) {
       alert("No more tasks available today!");
       return;
     }
+
     const randomTask = available[Math.floor(Math.random() * available.length)];
 
     const { error: insertErr } = await supabase
@@ -125,11 +134,14 @@ export async function loadTasksModule(supabase, updateBegRelease) {
         text: randomTask.task,
         done: false,
         difficulty: randomTask.difficulty || "Easy",
-        day_key: today,
-        created_at: new Date()
+        day_key: today
       });
 
-    if (insertErr) return console.error(insertErr);
+    if (insertErr) {
+      console.error("Error inserting new rolled task:", insertErr);
+      return;
+    }
+
     loadTodayTasks();
   });
 
