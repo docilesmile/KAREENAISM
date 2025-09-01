@@ -35,7 +35,7 @@ export async function loadChastityModule(supabase) {
     }
   }
 
-  async function reduceTimeForTask(minutes) {
+  window.reduceTimeForTask = async function(minutes) {
     if (!window.currentUser) return;
     const { data } = await supabase
       .from("chastityStatus")
@@ -55,10 +55,13 @@ export async function loadChastityModule(supabase) {
       .eq("id", latest.id);
 
     getChastityStatus();
-  }
+  };
 
-  async function attemptBegRelease(releaseOutputEl = null) {
+  // This version now accepts an output element to write the result
+  window.attemptBegRelease = async function(outputElement) {
     if (!window.currentUser) return;
+    if (!outputElement) outputElement = { innerText: "" };
+
     const { data } = await supabase
       .from("chastityStatus")
       .select("*")
@@ -67,12 +70,13 @@ export async function loadChastityModule(supabase) {
       .limit(1);
 
     if (!data || data.length === 0) {
-      if (releaseOutputEl) releaseOutputEl.innerText = "No chastity status found.";
-      return alert("No chastity status found.");
+      outputElement.innerText = "No chastity status found.";
+      return;
     }
 
     const latest = data[0];
     const roll = Math.random();
+
     if (roll < 0.1) {
       // SUCCESS: unlock
       await supabase
@@ -85,9 +89,7 @@ export async function loadChastityModule(supabase) {
         })
         .eq("id", latest.id);
 
-      const message = "Mercy granted... Goddess KAREENA releases you.";
-      if (releaseOutputEl) releaseOutputEl.innerText = message;
-      alert(message);
+      outputElement.innerText = "Mercy granted... Goddess KAREENA releases you!";
     } else {
       // FAILURE: +24 hours
       const newRelease = new Date(latest.release_date);
@@ -102,19 +104,12 @@ export async function loadChastityModule(supabase) {
         })
         .eq("id", latest.id);
 
-      const message = "Your begging displeased Goddess KAREENA. +24 hours added.";
-      if (releaseOutputEl) releaseOutputEl.innerText = message;
-      alert(message);
+      outputElement.innerText = "Your begging displeased Goddess KAREENA. +24 hours added.";
     }
 
     getChastityStatus();
-  }
-
-  window.reduceTimeForTask = reduceTimeForTask;
-  window.attemptBegRelease = attemptBegRelease;
+  };
 
   await getChastityStatus();
   setInterval(getChastityStatus, 60000);
-
-  return { reduceTimeForTask, attemptBegRelease };
 }
