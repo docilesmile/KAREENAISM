@@ -26,7 +26,9 @@ async function getChastityStatus(supabase, statusElement) {
 
   const latest = data[0];
   const now = new Date();
-  const release = latest.release_date ? new Date(latest.release_date) : null;
+
+  // Safe parsing for Supabase timestamps
+  const release = latest.release_date ? new Date(latest.release_date + 'Z') : null;
 
   if (latest.is_locked && release && release > now) {
     if (statusElement) statusElement.innerText = `Locked until ${release.toLocaleString()}.`;
@@ -53,7 +55,8 @@ async function reduceTimeForTask(supabase, minutes) {
 
   if (!latest.is_locked || !latest.release_date) return;
 
-  const newRelease = new Date(new Date(latest.release_date).getTime() - minutes * 60000);
+  const releaseDate = new Date(latest.release_date + 'Z');
+  const newRelease = new Date(releaseDate.getTime() - minutes * 60000);
 
   await supabase
     .from("chastityStatus")
@@ -63,24 +66,32 @@ async function reduceTimeForTask(supabase, minutes) {
   console.log(`Reduced chastity time by ${minutes} minutes. New release: ${newRelease}`);
 }
 
-// Apply penalties for incomplete tasks (only if locked)
-async function applyPenaltiesForIncompleteTasks(supabase) {
+// Apply penalties for incomplete tasks at 2am
+export async function applyPenaltiesForIncompleteTasks(supabase) {
   if (!window.currentUser) return;
 
-  const now = new Date();
   const today = new Date().toISOString().split("T")[0];
 
-  // Fetch all incomplete tasks for today
+  // Fetch incomplete tasks
   const { data: incompleteTasks, error } = await supabase
     .from("rolled_tasks")
-    .select("task_id, difficulty, done")
+    .select("id, task, difficulty, done")
     .eq("user_id", window.currentUser.id)
     .eq("day_key", today)
     .eq("done", false);
 
-  if (error || !incompleteTasks || incompleteTasks.length === 0) return;
+  if (error) {
+    console.error("Error fetching incomplete tasks:", error);
+    return;
+  }
 
-  // Fetch latest chastity status
+  if (!incompleteTasks || incompleteTasks.length === 0) return;
+
+  // Fetch penalty rules
+  const { data: rules } = await supabase.from("PenaltyRules").select("*");
+  if (!rules) return;
+
+  // Get latest chastity status
   const { data: statusData } = await supabase
     .from("chastityStatus")
     .select("*")
@@ -90,32 +101,29 @@ async function applyPenaltiesForIncompleteTasks(supabase) {
 
   if (!statusData || statusData.length === 0) return;
   const latest = statusData[0];
-
   if (!latest.is_locked || !latest.release_date) return;
 
-  // Fetch penalties from PenaltyRules table
-  const { data: penalties } = await supabase.from("PenaltyRules").select("*");
-  if (!penalties) return;
+  const releaseDate = new Date(latest.release_date + 'Z');
 
-  let totalPenalty = 0;
-  incompleteTasks.forEach(task => {
-    const rule = penalties.find(p => p.difficulty === task.difficulty);
-    if (rule) totalPenalty += rule.penalty;
-  });
+  // Sum penalties
+  let totalPenaltyMinutes = 0;
+  for (const task of incompleteTasks) {
+    const rule = rules.find(r => r.difficulty === task.difficulty);
+    if (rule) totalPenaltyMinutes += (rule.penalty || 0) * 60;
+  }
 
-  if (totalPenalty === 0) return;
+  const newRelease = new Date(releaseDate.getTime() + totalPenaltyMinutes * 60000);
 
-  const newRelease = new Date(new Date(latest.release_date).getTime() + totalPenalty * 3600000);
   await supabase
     .from("chastityStatus")
     .update({ release_date: newRelease.toISOString(), updated_at: new Date().toISOString() })
     .eq("id", latest.id);
 
-  console.log(`Applied penalty for incomplete tasks: +${totalPenalty} hours. New release: ${newRelease}`);
+  console.log(`Applied penalties for ${incompleteTasks.length} incomplete tasks. New release: ${newRelease}`);
 }
 
 // Beg for release
-async function attemptBegRelease(supabase, outputElement) {
+export async function attemptBegRelease(supabase, outputElement) {
   if (!window.currentUser) return;
 
   const latest = await getChastityStatus(supabase, outputElement);
@@ -125,9 +133,10 @@ async function attemptBegRelease(supabase, outputElement) {
   }
 
   const now = new Date();
+  const releaseDate = latest.release_date ? new Date(latest.release_date + 'Z') : null;
 
-  // If unlocked
-  if (!latest.is_locked || !latest.release_date || new Date(latest.release_date) <= now) {
+  if (!latest.is_locked || !releaseDate || releaseDate <= now) {
+    // Random release option
     const { data: options } = await supabase.from("releaseOptions").select("*");
     if (!options || options.length === 0) {
       outputElement.innerText = "Goddess KAREENA has no release options set.";
@@ -139,7 +148,7 @@ async function attemptBegRelease(supabase, outputElement) {
     return;
   }
 
-  // If locked: 10% chance of mercy, else +24h
+  // Locked: 10% release, 90% denial
   const roll = Math.random();
   if (roll < 0.1) {
     await supabase
@@ -155,9 +164,7 @@ async function attemptBegRelease(supabase, outputElement) {
     if (outputElement) outputElement.innerText = "Mercy granted... Goddess KAREENA releases you.";
     console.log("Beg release success!");
   } else {
-    const newRelease = new Date(latest.release_date);
-    newRelease.setHours(newRelease.getHours() + 24);
-
+    const newRelease = new Date(releaseDate.getTime() + 24 * 60 * 60000); // +24h
     await supabase
       .from("chastityStatus")
       .update({
@@ -184,7 +191,7 @@ export async function loadChastityModule(supabase) {
 
   const statusP = document.getElementById("chastityStatus");
 
-  // Assign globals for Index and tasksModule
+  // Assign globals for Index
   window.reduceTimeForTask = async (minutes) => reduceTimeForTask(supabase, minutes);
   window.attemptBegRelease = async (outputEl) => attemptBegRelease(supabase, outputEl);
   window.applyPenaltiesForIncompleteTasks = async () => applyPenaltiesForIncompleteTasks(supabase);
@@ -196,5 +203,4 @@ export async function loadChastityModule(supabase) {
   setInterval(() => getChastityStatus(supabase, statusP), 60000);
 }
 
-// Canon exports
-export { reduceTimeForTask, attemptBegRelease, applyPenaltiesForIncompleteTasks, loadChastityModule };
+export { reduceTimeForTask, attemptBegRelease, applyPenaltiesForIncompleteTasks };
