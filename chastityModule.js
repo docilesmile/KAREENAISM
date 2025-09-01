@@ -1,6 +1,6 @@
 // chastityModule.js
 
-// Core functions
+// Core function: get chastity status
 async function getChastityStatus(supabase, statusElement) {
   if (!window.currentUser) return;
   const { data } = await supabase
@@ -26,6 +26,7 @@ async function getChastityStatus(supabase, statusElement) {
   }
 }
 
+// Reduce time for task completion
 async function reduceTimeForTask(supabase, minutes) {
   if (!window.currentUser) return;
 
@@ -47,6 +48,7 @@ async function reduceTimeForTask(supabase, minutes) {
     .eq("id", latest.id);
 }
 
+// Attempt to beg for release
 async function attemptBegRelease(supabase, outputElement) {
   if (!window.currentUser) return;
 
@@ -63,38 +65,67 @@ async function attemptBegRelease(supabase, outputElement) {
   }
 
   const latest = data[0];
-  const roll = Math.random();
-  if (roll < 0.1) {
-    // SUCCESS: unlock
-    await supabase
-      .from("chastityStatus")
-      .update({
-        is_locked: false,
-        release_date: new Date().toISOString(),
-        source: "beg_success",
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", latest.id);
 
-    if (outputElement) outputElement.innerText = "Mercy granted... Goddess KAREENA releases you.";
+  if (latest.is_locked) {
+    // -----------------------------
+    // LOCKED: 10% release / 90% denial
+    // -----------------------------
+    const roll = Math.random();
+    if (roll < 0.1) {
+      // SUCCESS: unlock
+      await supabase
+        .from("chastityStatus")
+        .update({
+          is_locked: false,
+          release_date: new Date().toISOString(),
+          source: "beg_success",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", latest.id);
+
+      if (outputElement) outputElement.innerText = "Mercy granted... Goddess KAREENA releases you.";
+    } else {
+      // FAILURE: add penalty delay (10–70 minutes randomly)
+      const extraMinutes = Math.floor(Math.random() * 61) + 10; 
+      const newRelease = new Date(latest.release_date);
+      newRelease.setMinutes(newRelease.getMinutes() + extraMinutes);
+
+      await supabase
+        .from("chastityStatus")
+        .update({
+          release_date: newRelease.toISOString(),
+          source: "beg_failure",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", latest.id);
+
+      if (outputElement) outputElement.innerText = `Your begging displeased Goddess KAREENA. +${extraMinutes} minutes added.`;
+    }
+
   } else {
-    // FAILURE: +24 hours
-    const newRelease = new Date(latest.release_date);
-    newRelease.setHours(newRelease.getHours() + 24);
+    // -----------------------------
+    // UNLOCKED: pick a random releaseOption
+    // -----------------------------
+    const { data: options, error } = await supabase
+      .from("releaseOptions")
+      .select("option")
+      .order("RANDOM()")
+      .limit(1);
 
-    await supabase
-      .from("chastityStatus")
-      .update({
-        release_date: newRelease.toISOString(),
-        source: "beg_failure",
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", latest.id);
+    if (error || !options || options.length === 0) {
+      if (outputElement) outputElement.innerText = "No release options available.";
+      return;
+    }
 
-    if (outputElement) outputElement.innerText = "Your begging displeased Goddess KAREENA. +24 hours added.";
+    if (outputElement) outputElement.innerText = options[0].option;
   }
+
+  // Update UI
+  const statusP = document.getElementById("chastityStatus");
+  await getChastityStatus(supabase, statusP);
 }
 
+// Load module
 export async function loadChastityModule(supabase) {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
@@ -106,14 +137,14 @@ export async function loadChastityModule(supabase) {
 
   const statusP = document.getElementById("chastityStatus");
 
-  // Assign globals for Index
+  // Assign globals for Index compatibility
   window.reduceTimeForTask = async (minutes) => reduceTimeForTask(supabase, minutes);
   window.attemptBegRelease = async (outputEl) => attemptBegRelease(supabase, outputEl);
 
-  // Initial load
+  // Initial load + periodic refresh
   await getChastityStatus(supabase, statusP);
   setInterval(() => getChastityStatus(supabase, statusP), 60000);
 }
 
-// Export so Index can import
+// Export functions
 export { reduceTimeForTask, attemptBegRelease };
