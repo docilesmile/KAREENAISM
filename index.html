@@ -62,7 +62,7 @@ loginBtn.addEventListener("click", async () => {
   loginBtn.style.display = "none";
   logoutBtn.style.display = "inline-block";
 
-  // Load Holy Day Status Module first (top of page)
+  // Load Holy Day Status Module
   const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
   loadHolyDayStatusModule(supabase);
 
@@ -89,6 +89,7 @@ logoutBtn.addEventListener("click", async () => {
 
   document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
   releaseOutput.innerText = "";
+  begReleaseBtn.disabled = true;
 });
 
 begReleaseBtn.addEventListener("click", async () => {
@@ -97,10 +98,10 @@ begReleaseBtn.addEventListener("click", async () => {
   begReleaseBtn.disabled = true;
 });
 
+// Update beg button according to tasks completed
 function updateBegRelease(completedTasks) {
   begReleaseBtn.disabled = completedTasks < 5;
 }
 </script>
 </body>
 </html>
-
