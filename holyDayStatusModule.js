@@ -1,3 +1,4 @@
+// holyDaysStatusModule.js
 export async function loadHolyDayStatusModule(supabase) {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
