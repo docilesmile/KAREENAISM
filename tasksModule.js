@@ -17,6 +17,25 @@ export async function loadTasksModule(supabase, updateBegRelease) {
   const taskList = document.getElementById("taskList");
   const taskCounter = document.getElementById("taskCounter");
 
+  // ======= Beg Release Button =======
+  const begReleaseBtn = document.createElement("button");
+  begReleaseBtn.id = "begRelease";
+  begReleaseBtn.disabled = true;
+  begReleaseBtn.innerText = "Beg for Release";
+
+  const releaseOutput = document.createElement("p");
+  releaseOutput.id = "releaseOutput";
+
+  taskModuleDiv.appendChild(begReleaseBtn);
+  taskModuleDiv.appendChild(releaseOutput);
+
+  // Link click to chastity module
+  begReleaseBtn.addEventListener("click", async () => {
+    if (!window.currentUser || !window.attemptBegRelease) return;
+    await window.attemptBegRelease(supabase, releaseOutput);
+    begReleaseBtn.disabled = true;
+  });
+
   let completedCount = 0;
 
   const enableTaskButton = () => {
@@ -71,8 +90,10 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     });
 
     taskCounter.innerText = `${completedCount}/5 tasks complete today`;
-    console.log("Completed tasks count:", completedCount);
     if (updateBegRelease) updateBegRelease(completedCount);
+
+    // ======= Enable beg button if 5+ tasks done =======
+    begReleaseBtn.disabled = completedCount < 5;
   }
 
   async function markTaskComplete(taskId, difficulty) {
@@ -91,7 +112,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
 
     if (window.reduceTimeForTask) await window.reduceTimeForTask(minutes);
 
-    await loadTodayTasks(); // <-- ensure async update before checking Beg button
+    await loadTodayTasks();
   }
 
   async function rerollTask(taskId) {
@@ -135,7 +156,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       });
     }
 
-    await loadTodayTasks(); // <-- ensure tasks refresh after reroll
+    await loadTodayTasks();
   }
 
   getTaskBtn.addEventListener("click", async () => {
@@ -169,7 +190,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       created_at: new Date()
     });
 
-    await loadTodayTasks(); // <-- ensure tasks refresh after getting a new one
+    await loadTodayTasks();
   });
 
   await loadTodayTasks();
