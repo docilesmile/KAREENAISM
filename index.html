@@ -100,10 +100,22 @@ logoutBtn.addEventListener("click", async () => {
 // Beg button handler
 begReleaseBtn.addEventListener("click", async () => {
   if (!window.currentUser || !window.attemptBegRelease) return;
+
+  begReleaseBtn.disabled = true; // prevent double-click
   await window.attemptBegRelease(supabase, releaseOutput);
-  begReleaseBtn.disabled = true;
+
+  // Re-enable button only if 5+ tasks completed
+  const { data: rolled } = await supabase
+    .from("rolled_tasks")
+    .select("*")
+    .eq("user_id", window.currentUser.id)
+    .eq("done", true);
+
+  const completedCount = rolled?.length || 0;
+  if (completedCount >= 5) {
+    begReleaseBtn.disabled = false;
+  }
 });
 </script>
 </body>
 </html>
-
