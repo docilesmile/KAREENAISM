@@ -1,19 +1,27 @@
 // chastityModule.js
 
-// Get current chastity status
+// Get the latest chastity status for the current user
 async function getChastityStatus(supabase, statusElement) {
   if (!window.currentUser) return;
 
-  const { data } = await supabase
+  console.log("Fetching chastity status for:", window.currentUser.id);
+
+  const { data, error } = await supabase
     .from("chastityStatus")
     .select("*")
     .eq("user_id", window.currentUser.id)
     .order("created_at", { ascending: false })
     .limit(1);
 
+  if (error) {
+    console.error("Chastity status fetch error:", error);
+    if (statusElement) statusElement.innerText = "Error fetching chastity status.";
+    return null;
+  }
+
   if (!data || data.length === 0) {
     if (statusElement) statusElement.innerText = "No chastity status found.";
-    return;
+    return null;
   }
 
   const latest = data[0];
@@ -25,65 +33,70 @@ async function getChastityStatus(supabase, statusElement) {
   } else {
     if (statusElement) statusElement.innerText = "You are not locked.";
   }
+
+  return latest;
 }
 
-// Reduce time from current lock (after completing a task)
+// Reduce chastity time (e.g., for completing tasks)
 async function reduceTimeForTask(supabase, minutes) {
   if (!window.currentUser) return;
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("chastityStatus")
     .select("*")
     .eq("user_id", window.currentUser.id)
     .order("created_at", { ascending: false })
     .limit(1);
 
-  if (!data || data.length === 0) return;
-
+  if (error || !data || data.length === 0) return;
   const latest = data[0];
+
   if (!latest.is_locked || !latest.release_date) return;
 
-  const newRelease = new Date(new Date(latest.release_date).getTime() - minutes * 60 * 1000);
+  const newRelease = new Date(new Date(latest.release_date).getTime() - minutes * 60000);
+
   await supabase
     .from("chastityStatus")
     .update({ release_date: newRelease.toISOString(), updated_at: new Date().toISOString() })
     .eq("id", latest.id);
+
+  console.log(`Reduced chastity time by ${minutes} minutes. New release: ${newRelease}`);
 }
 
-// Attempt to beg for release
+// Beg for release
 async function attemptBegRelease(supabase, outputElement) {
   if (!window.currentUser) return;
 
-  const { data } = await supabase
-    .from("chastityStatus")
-    .select("*")
-    .eq("user_id", window.currentUser.id)
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (!data || data.length === 0) {
+  const latest = await getChastityStatus(supabase, outputElement);
+  if (!latest) {
     if (outputElement) outputElement.innerText = "No chastity status found.";
     return;
   }
 
-  const latest = data[0];
+  const now = new Date();
 
-  // UNLOCKED: pick random releaseOption
-  if (!latest.is_locked) {
-    const { data: options } = await supabase.from("releaseOptions").select("*");
+  // If unlocked
+  if (!latest.is_locked || !latest.release_date || new Date(latest.release_date) <= now) {
+    // Randomly select a release or denial task from releaseOptions
+    const { data: options } = await supabase
+      .from("releaseOptions")
+      .select("*");
+
     if (!options || options.length === 0) {
-      if (outputElement) outputElement.innerText = "Goddess KAREENA has nothing for you at the moment...";
+      outputElement.innerText = "Goddess KAREENA has no release options set.";
       return;
     }
-    const choice = options[Math.floor(Math.random() * options.length)];
-    if (outputElement) outputElement.innerText = choice?.message || "Goddess KAREENA has something for you...";
+
+    const selected = options[Math.floor(Math.random() * options.length)];
+    outputElement.innerText = `Goddess KAREENA says: ${selected.task || "..."}`;
+    console.log("Unlocked beg release selection:", selected);
     return;
   }
 
-  // LOCKED: 10% release / 90% denial
+  // If locked: 10% release, 90% denial with +delay
   const roll = Math.random();
   if (roll < 0.1) {
-    // SUCCESS: unlock
+    // Release
     await supabase
       .from("chastityStatus")
       .update({
@@ -95,9 +108,10 @@ async function attemptBegRelease(supabase, outputElement) {
       .eq("id", latest.id);
 
     if (outputElement) outputElement.innerText = "Mercy granted... Goddess KAREENA releases you.";
+    console.log("Beg release success!");
   } else {
-    // FAILURE: +24 hours
-    const newRelease = latest.release_date ? new Date(latest.release_date) : new Date();
+    // Denial: add 24h
+    const newRelease = new Date(latest.release_date);
     newRelease.setHours(newRelease.getHours() + 24);
 
     await supabase
@@ -110,10 +124,11 @@ async function attemptBegRelease(supabase, outputElement) {
       .eq("id", latest.id);
 
     if (outputElement) outputElement.innerText = "Your begging displeased Goddess KAREENA. +24 hours added.";
+    console.log("Beg release denied. New release:", newRelease);
   }
 }
 
-// Load Chastity Module UI
+// Load module into Index
 export async function loadChastityModule(supabase) {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
@@ -125,14 +140,15 @@ export async function loadChastityModule(supabase) {
 
   const statusP = document.getElementById("chastityStatus");
 
-  // Assign globals for Index compatibility
+  // Assign globals for Index
   window.reduceTimeForTask = async (minutes) => reduceTimeForTask(supabase, minutes);
   window.attemptBegRelease = async (outputEl) => attemptBegRelease(supabase, outputEl);
 
-  // Initial load + periodic refresh
+  // Initial load
   await getChastityStatus(supabase, statusP);
+
+  // Refresh every minute
   setInterval(() => getChastityStatus(supabase, statusP), 60000);
 }
 
-// Export so Index can import
 export { reduceTimeForTask, attemptBegRelease };
