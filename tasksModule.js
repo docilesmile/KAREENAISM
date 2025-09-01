@@ -71,6 +71,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     });
 
     taskCounter.innerText = `${completedCount}/5 tasks complete today`;
+    console.log("Completed tasks count:", completedCount);
     if (updateBegRelease) updateBegRelease(completedCount);
   }
 
@@ -90,7 +91,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
 
     if (window.reduceTimeForTask) await window.reduceTimeForTask(minutes);
 
-    loadTodayTasks();
+    await loadTodayTasks(); // <-- ensure async update before checking Beg button
   }
 
   async function rerollTask(taskId) {
@@ -134,7 +135,7 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       });
     }
 
-    loadTodayTasks();
+    await loadTodayTasks(); // <-- ensure tasks refresh after reroll
   }
 
   getTaskBtn.addEventListener("click", async () => {
@@ -168,9 +169,8 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       created_at: new Date()
     });
 
-    loadTodayTasks();
+    await loadTodayTasks(); // <-- ensure tasks refresh after getting a new one
   });
 
-  loadTodayTasks();
-  document.addEventListener("userLoggedIn", enableTaskButton);
+  await loadTodayTasks();
 }
