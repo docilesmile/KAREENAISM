@@ -47,32 +47,20 @@
   <!-- Modules -->
   <div id="modulesContainer">Loading Modules from Goddess KAREENA's will...</div>
 
-  <hr>
-
-  <!-- Beg Release -->
-  <button id="begRelease" disabled>Beg for Release</button>
-  <p id="releaseOutput"></p>
-
   <script type="module">
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
     const supabaseUrl = "https://djdhtdrseqfaiskvbvhb.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; // Replace with your anon key
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const emailInput = document.getElementById("email");
     const passwordInput = document.getElementById("password");
     const loginBtn = document.getElementById("login");
     const logoutBtn = document.getElementById("logout");
-    const begReleaseBtn = document.getElementById("begRelease");
-    const releaseOutput = document.getElementById("releaseOutput");
 
     let currentUser = null;
     window.currentUser = null;
-
-    function updateBegRelease(completedTasks) {
-      begReleaseBtn.disabled = completedTasks < 5;
-    }
 
     // Login
     loginBtn.addEventListener("click", async () => {
@@ -93,14 +81,10 @@
       loadHolyDayStatusModule(supabase);
 
       const { loadTasksModule } = await import('./tasksModule.js');
-      loadTasksModule(supabase, updateBegRelease);
+      loadTasksModule(supabase); // beg-for-release now handled inside tasksModule
 
-      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
+      const { loadChastityModule } = await import('./chastityModule.js');
       await loadChastityModule(supabase);
-
-      // Make globals available
-      window.reduceTimeForTask = reduceTimeForTask;
-      window.attemptBegRelease = attemptBegRelease;
     });
 
     // Logout
@@ -113,15 +97,6 @@
       logoutBtn.style.display = "none";
 
       document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
-      releaseOutput.innerText = "";
-      begReleaseBtn.disabled = true;
-    });
-
-    // Beg Release button
-    begReleaseBtn.addEventListener("click", async () => {
-      if (!window.currentUser || !window.attemptBegRelease) return;
-      await window.attemptBegRelease(supabase, releaseOutput);
-      begReleaseBtn.disabled = true;
     });
   </script>
 </body>
