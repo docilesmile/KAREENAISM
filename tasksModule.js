@@ -1,6 +1,5 @@
 // tasksModule.js
 export async function loadTasksModule(supabase, updateBegRelease) {
-  if (!supabase) throw new Error("Supabase client must be passed into tasksModule");
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
 
@@ -63,11 +62,11 @@ export async function loadTasksModule(supabase, updateBegRelease) {
           await rerollTask(task.id);
         };
         div.appendChild(rerollBtn);
-
       } else {
         div.classList.add("done");
         completedCount++;
       }
+
       taskList.appendChild(div);
     });
 
@@ -98,24 +97,17 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (!window.currentUser) return;
     const today = new Date().toISOString().split("T")[0];
 
-    // fetch all tasks
-    const { data: allTasks, error: allErr } = await supabase
-      .from("TaskLists")
-      .select("id, task, difficulty");
-
+    const { data: allTasks, error: allErr } = await supabase.from("TaskLists").select("id, task, difficulty");
     if (allErr) return console.error(allErr);
 
-    // fetch current rolled tasks
     const { data: rolled, error: rolledErr } = await supabase
       .from("rolled_tasks")
       .select("task")
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today);
-
     if (rolledErr) return console.error(rolledErr);
-    const rolledTasks = rolled?.map(r => r.task) || [];
 
-    // pick two random unrolled tasks
+    const rolledTasks = rolled?.map(r => r.task) || [];
     const available = allTasks.filter(t => !rolledTasks.includes(t.task));
     if (available.length === 0) {
       alert("No more tasks available to reroll!");
@@ -129,28 +121,19 @@ export async function loadTasksModule(supabase, updateBegRelease) {
       newTasks.push(available.splice(randomIndex, 1)[0]);
     }
 
-    // delete current task
-    await supabase
-      .from("rolled_tasks")
-      .delete()
-      .eq("id", taskId)
-      .eq("user_id", window.currentUser.id);
+    await supabase.from("rolled_tasks").delete().eq("id", taskId).eq("user_id", window.currentUser.id);
 
-    // insert new tasks
     for (const t of newTasks) {
-      await supabase
-        .from("rolled_tasks")
-        .insert({
-          user_id: window.currentUser.id,
-          task: t.task,
-          difficulty: t.difficulty || "Easy",
-          done: false,
-          day_key: today,
-          created_at: new Date()
-        });
+      await supabase.from("rolled_tasks").insert({
+        user_id: window.currentUser.id,
+        task: t.task,
+        difficulty: t.difficulty || "Easy",
+        done: false,
+        day_key: today,
+        created_at: new Date()
+      });
     }
 
-    // no time deduction on reroll
     loadTodayTasks();
   }
 
@@ -158,21 +141,15 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     if (!window.currentUser) return;
     const today = new Date().toISOString().split("T")[0];
 
-    // fetch today's rolled tasks
     const { data: rolled, error: rolledErr } = await supabase
       .from("rolled_tasks")
       .select("task")
       .eq("user_id", window.currentUser.id)
       .eq("day_key", today);
-
     if (rolledErr) return console.error(rolledErr);
+
     const rolledTasks = rolled?.map(r => r.task) || [];
-
-    // fetch all tasks
-    const { data: allTasks, error: allErr } = await supabase
-      .from("TaskLists")
-      .select("id, task, difficulty");
-
+    const { data: allTasks, error: allErr } = await supabase.from("TaskLists").select("id, task, difficulty");
     if (allErr) return console.error(allErr);
 
     const available = allTasks.filter(t => !rolledTasks.includes(t.task));
@@ -182,17 +159,14 @@ export async function loadTasksModule(supabase, updateBegRelease) {
     }
 
     const randomTask = available[Math.floor(Math.random() * available.length)];
-
-    await supabase
-      .from("rolled_tasks")
-      .insert({
-        user_id: window.currentUser.id,
-        task: randomTask.task,
-        done: false,
-        difficulty: randomTask.difficulty || "Easy",
-        day_key: today,
-        created_at: new Date()
-      });
+    await supabase.from("rolled_tasks").insert({
+      user_id: window.currentUser.id,
+      task: randomTask.task,
+      done: false,
+      difficulty: randomTask.difficulty || "Easy",
+      day_key: today,
+      created_at: new Date()
+    });
 
     loadTodayTasks();
   });
