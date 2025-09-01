@@ -35,7 +35,7 @@ export async function loadChastityModule(supabase) {
     }
   }
 
-  window.reduceTimeForTask = async function(minutes) {
+  async function reduceTimeForTask(minutes) {
     if (!window.currentUser) return;
     const { data } = await supabase
       .from("chastityStatus")
@@ -55,13 +55,10 @@ export async function loadChastityModule(supabase) {
       .eq("id", latest.id);
 
     getChastityStatus();
-  };
+  }
 
-  // This version now accepts an output element to write the result
-  window.attemptBegRelease = async function(outputElement) {
+  async function attemptBegRelease(outputElement) {
     if (!window.currentUser) return;
-    if (!outputElement) outputElement = { innerText: "" };
-
     const { data } = await supabase
       .from("chastityStatus")
       .select("*")
@@ -70,13 +67,12 @@ export async function loadChastityModule(supabase) {
       .limit(1);
 
     if (!data || data.length === 0) {
-      outputElement.innerText = "No chastity status found.";
+      if (outputElement) outputElement.innerText = "No chastity status found.";
       return;
     }
 
     const latest = data[0];
     const roll = Math.random();
-
     if (roll < 0.1) {
       // SUCCESS: unlock
       await supabase
@@ -89,7 +85,7 @@ export async function loadChastityModule(supabase) {
         })
         .eq("id", latest.id);
 
-      outputElement.innerText = "Mercy granted... Goddess KAREENA releases you!";
+      if (outputElement) outputElement.innerText = "Mercy granted... Goddess KAREENA releases you.";
     } else {
       // FAILURE: +24 hours
       const newRelease = new Date(latest.release_date);
@@ -104,12 +100,19 @@ export async function loadChastityModule(supabase) {
         })
         .eq("id", latest.id);
 
-      outputElement.innerText = "Your begging displeased Goddess KAREENA. +24 hours added.";
+      if (outputElement) outputElement.innerText = "Your begging displeased Goddess KAREENA. +24 hours added.";
     }
 
     getChastityStatus();
-  };
+  }
+
+  // Assign globals for Index compatibility
+  window.reduceTimeForTask = reduceTimeForTask;
+  window.attemptBegRelease = attemptBegRelease;
 
   await getChastityStatus();
   setInterval(getChastityStatus, 60000);
 }
+
+// Export the functions directly so Index can import them
+export { reduceTimeForTask, attemptBegRelease };
