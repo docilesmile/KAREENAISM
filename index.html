@@ -49,6 +49,12 @@ const releaseOutput = document.getElementById("releaseOutput");
 let currentUser = null;
 window.currentUser = null;
 
+// Update beg button according to tasks completed
+function updateBegRelease(completedTasks) {
+  begReleaseBtn.disabled = completedTasks < 5;
+}
+
+// Login handler
 loginBtn.addEventListener("click", async () => {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: emailInput.value,
@@ -62,15 +68,13 @@ loginBtn.addEventListener("click", async () => {
   loginBtn.style.display = "none";
   logoutBtn.style.display = "inline-block";
 
-  // Load Holy Day Status Module
-  const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
+  // Load modules dynamically
+  const { loadHolyDayStatusModule } = await import('./holyDaysStatusModule.js');
   loadHolyDayStatusModule(supabase);
 
-  // Load Tasks Module
   const { loadTasksModule } = await import('./tasksModule.js');
   loadTasksModule(supabase, updateBegRelease);
 
-  // Load Chastity Module
   const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
   await loadChastityModule(supabase);
 
@@ -79,6 +83,7 @@ loginBtn.addEventListener("click", async () => {
   window.attemptBegRelease = attemptBegRelease;
 });
 
+// Logout handler
 logoutBtn.addEventListener("click", async () => {
   await supabase.auth.signOut();
   currentUser = null;
@@ -92,16 +97,12 @@ logoutBtn.addEventListener("click", async () => {
   begReleaseBtn.disabled = true;
 });
 
+// Beg button handler
 begReleaseBtn.addEventListener("click", async () => {
   if (!window.currentUser || !window.attemptBegRelease) return;
   await window.attemptBegRelease(supabase, releaseOutput);
   begReleaseBtn.disabled = true;
 });
-
-// Update beg button according to tasks completed
-function updateBegRelease(completedTasks) {
-  begReleaseBtn.disabled = completedTasks < 5;
-}
 </script>
 </body>
 </html>
