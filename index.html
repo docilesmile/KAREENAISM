@@ -1,141 +1,128 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>KAREENAISM Task Spinner</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm"></script>
-<style>
-  body { font-family: Arial, sans-serif; background: #111; color: #eee; text-align: center; padding: 20px; }
-  button { padding: 10px 20px; margin: 10px; border: none; border-radius: 5px; background: #e91e63; color: #fff; font-size: 16px; cursor: pointer; }
-  button:disabled { background: #555; cursor: not-allowed; }
-  input { padding: 10px; margin: 5px; font-size: 14px; }
-  .task { margin: 5px 0; }
-  .done { text-decoration: line-through; color: gray; }
-</style>
+  <meta charset="UTF-8">
+  <title>KAREENAISM Task Spinner</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #eee;
+      text-align: center;
+      padding: 20px;
+    }
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 5px;
+      border: none;
+      font-size: 16px;
+    }
+    button {
+      background: #e91e63;
+      color: white;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+    .task { margin: 5px 0; }
+    .done { text-decoration: line-through; color: gray; }
+  </style>
 </head>
 <body>
-<h1>Praise Goddess KAREENA!</h1>
+  <h1>Praise Goddess KAREENA!</h1>
 
-<!-- Login Form -->
-<div id="loginDiv">
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <button id="loginBtn">Login</button>
-</div>
-<button id="logoutBtn" style="display:none;">Logout</button>
+  <!-- Login -->
+  <form id="loginForm" onsubmit="return false;">
+    <input type="email" id="email" placeholder="Email" autocomplete="username">
+    <input type="password" id="password" placeholder="Password" autocomplete="current-password">
+    <button id="login">Login</button>
+  </form>
+  <button id="logout" style="display:none;">Logout</button>
 
-<hr>
+  <hr>
 
-<div id="modulesContainer">Loading Modules from Goddess KAREENA's will...</div>
+  <!-- Modules -->
+  <div id="modulesContainer">Loading Modules from Goddess KAREENA's will...</div>
 
-<hr>
+  <hr>
 
-<!-- Beg Release -->
-<button id="begRelease" disabled>Beg for Release</button>
-<p id="releaseOutput"></p>
+  <!-- Beg Release -->
+  <button id="begRelease" disabled>Beg for Release</button>
+  <p id="releaseOutput"></p>
 
-<script type="module">
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-// --- Supabase setup ---
-const supabaseUrl = "https://djdhtdrseqfaiskvbvhb.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; 
-const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseUrl = "https://djdhtdrseqfaiskvbvhb.supabase.co";
+    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"; // Replace with your anon key
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- DOM Elements ---
-const loginDiv = document.getElementById("loginDiv");
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const begReleaseBtn = document.getElementById("begRelease");
-const releaseOutput = document.getElementById("releaseOutput");
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const loginBtn = document.getElementById("login");
+    const logoutBtn = document.getElementById("logout");
+    const begReleaseBtn = document.getElementById("begRelease");
+    const releaseOutput = document.getElementById("releaseOutput");
 
-let currentUser = null;
+    let currentUser = null;
+    window.currentUser = null;
 
-// --- Update Beg button based on tasks completed ---
-function updateBegButton(completedTasks) {
-  begReleaseBtn.disabled = completedTasks < 5;
-}
+    function updateBegRelease(completedTasks) {
+      begReleaseBtn.disabled = completedTasks < 5;
+    }
 
-// --- Login ---
-loginBtn.addEventListener("click", async () => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: emailInput.value,
-    password: passwordInput.value
-  });
-  if (error) return alert(error.message);
+    // Login
+    loginBtn.addEventListener("click", async () => {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: emailInput.value,
+        password: passwordInput.value
+      });
+      if (error) return alert(error.message);
 
-  currentUser = data.user;
-  console.log("Logged in:", currentUser);
+      currentUser = data.user;
+      window.currentUser = currentUser;
 
-  loginDiv.style.display = "none";
-  logoutBtn.style.display = "inline-block";
+      loginBtn.style.display = "none";
+      logoutBtn.style.display = "inline-block";
 
-  // Load modules dynamically
-  const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
-  loadHolyDayStatusModule(supabase);
+      // Dynamically load modules
+      const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
+      loadHolyDayStatusModule(supabase);
 
-  const { loadTasksModule } = await import('./tasksModule.js');
-  loadTasksModule(supabase, updateBegButton);
+      const { loadTasksModule } = await import('./tasksModule.js');
+      loadTasksModule(supabase, updateBegRelease);
 
-  const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
-  await loadChastityModule(supabase);
+      const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
+      await loadChastityModule(supabase);
 
-  window.reduceTimeForTask = reduceTimeForTask;
-  window.attemptBegRelease = attemptBegRelease;
-});
+      // Make globals available
+      window.reduceTimeForTask = reduceTimeForTask;
+      window.attemptBegRelease = attemptBegRelease;
+    });
 
-// --- Logout ---
-logoutBtn.addEventListener("click", async () => {
-  await supabase.auth.signOut();
-  currentUser = null;
+    // Logout
+    logoutBtn.addEventListener("click", async () => {
+      await supabase.auth.signOut();
+      currentUser = null;
+      window.currentUser = null;
 
-  loginDiv.style.display = "block";
-  logoutBtn.style.display = "none";
-  begReleaseBtn.disabled = true;
-  releaseOutput.innerText = "";
-  document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
-});
+      loginBtn.style.display = "inline-block";
+      logoutBtn.style.display = "none";
 
-// --- Beg Release ---
-begReleaseBtn.addEventListener("click", async () => {
-  if (!currentUser || !window.attemptBegRelease) return;
-  await window.attemptBegRelease(supabase, releaseOutput);
-  begReleaseBtn.disabled = true;
-});
+      document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
+      releaseOutput.innerText = "";
+      begReleaseBtn.disabled = true;
+    });
 
-// --- Initialize on page load ---
-async function init() {
-  console.log("Initializing…");
-
-  const { data } = await supabase.auth.getUser();
-  currentUser = data?.user || null;
-  console.log("Current user:", currentUser);
-
-  if (!currentUser) {
-    loginDiv.style.display = "block";
-    return;
-  } else {
-    loginDiv.style.display = "none";
-    logoutBtn.style.display = "inline-block";
-
-    const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
-    loadHolyDayStatusModule(supabase);
-
-    const { loadTasksModule } = await import('./tasksModule.js');
-    loadTasksModule(supabase, updateBegButton);
-
-    const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
-    await loadChastityModule(supabase);
-
-    window.reduceTimeForTask = reduceTimeForTask;
-    window.attemptBegRelease = attemptBegRelease;
-  }
-}
-
-init();
-</script>
+    // Beg Release button
+    begReleaseBtn.addEventListener("click", async () => {
+      if (!window.currentUser || !window.attemptBegRelease) return;
+      await window.attemptBegRelease(supabase, releaseOutput);
+      begReleaseBtn.disabled = true;
+    });
+  </script>
 </body>
 </html>
-
