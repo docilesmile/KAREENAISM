@@ -1,197 +1,195 @@
 // tasksModule.js
 export async function loadTasksModule(supabase, updateBegRelease) {
-  const modulesContainer = document.getElementById("modulesContainer");
-  if (!modulesContainer) return;
+    const modulesContainer = document.getElementById("modulesContainer");
+    if (!modulesContainer) return;
 
-  const taskModuleDiv = document.createElement("div");
-  taskModuleDiv.id = "tasksModule";
-  taskModuleDiv.innerHTML = `
-    <h2>Daily Tasks</h2>
-    <button id="getTaskBtn" disabled>Get Task</button>
-    <div id="taskList">Loading tasks...</div>
-    <p id="taskCounter">0/5 tasks complete today</p>
-  `;
-  modulesContainer.appendChild(taskModuleDiv);
+    const taskModuleDiv = document.createElement("div");
+    taskModuleDiv.id = "tasksModule";
+    taskModuleDiv.innerHTML = `
+        <h2>Daily Tasks</h2>
+        <button id="getTaskBtn" disabled>Get Task</button>
+        <div id="taskList">Loading tasks...</div>
+        <p id="taskCounter">0/5 tasks complete today</p>
+        <button id="begRelease" disabled>Beg for Release</button>
+        <p id="releaseOutput"></p>
+    `;
+    modulesContainer.appendChild(taskModuleDiv);
 
-  const getTaskBtn = document.getElementById("getTaskBtn");
-  const taskList = document.getElementById("taskList");
-  const taskCounter = document.getElementById("taskCounter");
+    const getTaskBtn = document.getElementById("getTaskBtn");
+    const taskList = document.getElementById("taskList");
+    const taskCounter = document.getElementById("taskCounter");
+    const begReleaseBtn = document.getElementById("begRelease");
+    const releaseOutput = document.getElementById("releaseOutput");
 
-  // ======= Beg Release Button =======
-  const begReleaseBtn = document.createElement("button");
-  begReleaseBtn.id = "begRelease";
-  begReleaseBtn.disabled = true;
-  begReleaseBtn.innerText = "Beg for Release";
+    let completedCount = 0;
 
-  const releaseOutput = document.createElement("p");
-  releaseOutput.id = "releaseOutput";
+    const enableTaskButton = () => {
+        if (window.currentUser) getTaskBtn.disabled = false;
+    };
+    enableTaskButton();
 
-  taskModuleDiv.appendChild(begReleaseBtn);
-  taskModuleDiv.appendChild(releaseOutput);
+    async function loadTodayTasks() {
+        if (!window.currentUser) return;
+        const today = new Date().toISOString().split("T")[0];
 
-  // Link click to chastity module
-  begReleaseBtn.addEventListener("click", async () => {
-    if (!window.currentUser || !window.attemptBegRelease) return;
-    await window.attemptBegRelease(supabase, releaseOutput);
-    begReleaseBtn.disabled = true;
-  });
+        const { data, error } = await supabase
+            .from("rolled_tasks")
+            .select("*")
+            .eq("user_id", window.currentUser.id)
+            .eq("day_key", today);
 
-  let completedCount = 0;
+        if (error) {
+            console.error(error);
+            taskList.innerHTML = "Error loading tasks. Please refresh.";
+            return;
+        }
 
-  const enableTaskButton = () => {
-    if (window.currentUser) getTaskBtn.disabled = false;
-  };
-  enableTaskButton();
+        taskList.innerHTML = "";
+        completedCount = 0;
 
-  async function loadTodayTasks() {
-    if (!window.currentUser) return;
-    const today = new Date().toISOString().split("T")[0];
+        (data || []).forEach(task => {
+            const div = document.createElement("div");
+            div.className = "task";
+            div.innerText = `${task.task} [${task.difficulty || "Easy"}]`;
 
-    const { data, error } = await supabase
-      .from("rolled_tasks")
-      .select("*")
-      .eq("user_id", window.currentUser.id)
-      .eq("day_key", today);
+            if (!task.done) {
+                const completeBtn = document.createElement("button");
+                completeBtn.innerText = "Complete";
+                completeBtn.onclick = async () => {
+                    await markTaskComplete(task.id, task.difficulty);
+                };
+                div.appendChild(completeBtn);
 
-    if (error) {
-      console.error(error);
-      taskList.innerHTML = "Error loading tasks. Please refresh.";
-      return;
+                const rerollBtn = document.createElement("button");
+                rerollBtn.innerText = "Reroll (forfeit)";
+                rerollBtn.onclick = async () => {
+                    await rerollTask(task.id);
+                };
+                div.appendChild(rerollBtn);
+            } else {
+                div.classList.add("done");
+                completedCount++;
+            }
+
+            taskList.appendChild(div);
+        });
+
+        taskCounter.innerText = `${completedCount}/5 tasks complete today`;
+        if (updateBegRelease) updateBegRelease(completedCount);
+
+        // Update beg for release button
+        begReleaseBtn.disabled = completedCount < 5;
     }
 
-    taskList.innerHTML = "";
-    completedCount = 0;
+    async function markTaskComplete(taskId, difficulty) {
+        if (!window.currentUser) return;
 
-    (data || []).forEach(task => {
-      const div = document.createElement("div");
-      div.className = "task";
-      div.innerText = `${task.task} [${task.difficulty || "Easy"}]`;
+        await supabase
+            .from("rolled_tasks")
+            .update({ done: true })
+            .eq("id", taskId)
+            .eq("user_id", window.currentUser.id);
 
-      if (!task.done) {
-        const completeBtn = document.createElement("button");
-        completeBtn.innerText = "Complete";
-        completeBtn.onclick = async () => {
-          await markTaskComplete(task.id, task.difficulty);
-        };
-        div.appendChild(completeBtn);
+        let minutes = 0;
+        if (difficulty === "Easy") minutes = 60;
+        else if (difficulty === "Medium") minutes = 120;
+        else if (difficulty === "Hard") minutes = 300;
+        else if (difficulty === "Extra Hard") minutes = 420;
 
-        const rerollBtn = document.createElement("button");
-        rerollBtn.innerText = "Reroll (forfeit)";
-        rerollBtn.onclick = async () => {
-          await rerollTask(task.id);
-        };
-        div.appendChild(rerollBtn);
-      } else {
-        div.classList.add("done");
-        completedCount++;
-      }
+        if (window.reduceTimeForTask) await window.reduceTimeForTask(minutes);
 
-      taskList.appendChild(div);
+        await loadTodayTasks();
+    }
+
+    async function rerollTask(taskId) {
+        if (!window.currentUser) return;
+        const today = new Date().toISOString().split("T")[0];
+
+        const { data: allTasks, error: allErr } = await supabase.from("TaskLists").select("id, task, difficulty");
+        if (allErr) return console.error(allErr);
+
+        const { data: rolled, error: rolledErr } = await supabase
+            .from("rolled_tasks")
+            .select("task")
+            .eq("user_id", window.currentUser.id)
+            .eq("day_key", today);
+        if (rolledErr) return console.error(rolledErr);
+
+        const rolledTasks = rolled?.map(r => r.task) || [];
+        const available = allTasks.filter(t => !rolledTasks.includes(t.task));
+        if (available.length === 0) {
+            alert("No more tasks available to reroll!");
+            return;
+        }
+
+        const newTasks = [];
+        for (let i = 0; i < 2; i++) {
+            if (available.length === 0) break;
+            const randomIndex = Math.floor(Math.random() * available.length);
+            newTasks.push(available.splice(randomIndex, 1)[0]);
+        }
+
+        await supabase.from("rolled_tasks").delete().eq("id", taskId).eq("user_id", window.currentUser.id);
+
+        for (const t of newTasks) {
+            await supabase.from("rolled_tasks").insert({
+                user_id: window.currentUser.id,
+                task: t.task,
+                difficulty: t.difficulty || "Easy",
+                done: false,
+                day_key: today,
+                created_at: new Date()
+            });
+        }
+
+        await loadTodayTasks();
+    }
+
+    getTaskBtn.addEventListener("click", async () => {
+        if (!window.currentUser) return;
+        const today = new Date().toISOString().split("T")[0];
+
+        const { data: rolled, error: rolledErr } = await supabase
+            .from("rolled_tasks")
+            .select("task")
+            .eq("user_id", window.currentUser.id)
+            .eq("day_key", today);
+        if (rolledErr) return console.error(rolledErr);
+
+        const rolledTasks = rolled?.map(r => r.task) || [];
+        const { data: allTasks, error: allErr } = await supabase.from("TaskLists").select("id, task, difficulty");
+        if (allErr) return console.error(allErr);
+
+        const available = allTasks.filter(t => !rolledTasks.includes(t.task));
+        if (available.length === 0) {
+            alert("No more tasks available today!");
+            return;
+        }
+
+        const randomTask = available[Math.floor(Math.random() * available.length)];
+        await supabase.from("rolled_tasks").insert({
+            user_id: window.currentUser.id,
+            task: randomTask.task,
+            done: false,
+            difficulty: randomTask.difficulty || "Easy",
+            day_key: today,
+            created_at: new Date()
+        });
+
+        await loadTodayTasks();
     });
 
-    taskCounter.innerText = `${completedCount}/5 tasks complete today`;
-    if (updateBegRelease) updateBegRelease(completedCount);
-
-    // ======= Enable beg button if 5+ tasks done =======
-    begReleaseBtn.disabled = completedCount < 5;
-  }
-
-  async function markTaskComplete(taskId, difficulty) {
-    if (!window.currentUser) return;
-
-    await supabase
-      .from("rolled_tasks")
-      .update({ done: true })
-      .eq("id", taskId)
-      .eq("user_id", window.currentUser.id);
-
-    let minutes = 0;
-    if (difficulty === "Easy") minutes = 60;
-    else if (difficulty === "Medium") minutes = 120;
-    else if (difficulty === "Hard") minutes = 300;
-
-    if (window.reduceTimeForTask) await window.reduceTimeForTask(minutes);
-
-    await loadTodayTasks();
-  }
-
-  async function rerollTask(taskId) {
-    if (!window.currentUser) return;
-    const today = new Date().toISOString().split("T")[0];
-
-    const { data: allTasks, error: allErr } = await supabase.from("TaskLists").select("id, task, difficulty");
-    if (allErr) return console.error(allErr);
-
-    const { data: rolled, error: rolledErr } = await supabase
-      .from("rolled_tasks")
-      .select("task")
-      .eq("user_id", window.currentUser.id)
-      .eq("day_key", today);
-    if (rolledErr) return console.error(rolledErr);
-
-    const rolledTasks = rolled?.map(r => r.task) || [];
-    const available = allTasks.filter(t => !rolledTasks.includes(t.task));
-    if (available.length === 0) {
-      alert("No more tasks available to reroll!");
-      return;
-    }
-
-    const newTasks = [];
-    for (let i = 0; i < 2; i++) {
-      if (available.length === 0) break;
-      const randomIndex = Math.floor(Math.random() * available.length);
-      newTasks.push(available.splice(randomIndex, 1)[0]);
-    }
-
-    await supabase.from("rolled_tasks").delete().eq("id", taskId).eq("user_id", window.currentUser.id);
-
-    for (const t of newTasks) {
-      await supabase.from("rolled_tasks").insert({
-        user_id: window.currentUser.id,
-        task: t.task,
-        difficulty: t.difficulty || "Easy",
-        done: false,
-        day_key: today,
-        created_at: new Date()
-      });
-    }
-
-    await loadTodayTasks();
-  }
-
-  getTaskBtn.addEventListener("click", async () => {
-    if (!window.currentUser) return;
-    const today = new Date().toISOString().split("T")[0];
-
-    const { data: rolled, error: rolledErr } = await supabase
-      .from("rolled_tasks")
-      .select("task")
-      .eq("user_id", window.currentUser.id)
-      .eq("day_key", today);
-    if (rolledErr) return console.error(rolledErr);
-
-    const rolledTasks = rolled?.map(r => r.task) || [];
-    const { data: allTasks, error: allErr } = await supabase.from("TaskLists").select("id, task, difficulty");
-    if (allErr) return console.error(allErr);
-
-    const available = allTasks.filter(t => !rolledTasks.includes(t.task));
-    if (available.length === 0) {
-      alert("No more tasks available today!");
-      return;
-    }
-
-    const randomTask = available[Math.floor(Math.random() * available.length)];
-    await supabase.from("rolled_tasks").insert({
-      user_id: window.currentUser.id,
-      task: randomTask.task,
-      done: false,
-      difficulty: randomTask.difficulty || "Easy",
-      day_key: today,
-      created_at: new Date()
+    begReleaseBtn.addEventListener("click", async () => {
+        if (!window.currentUser || !window.attemptBegRelease) return;
+        await window.attemptBegRelease(supabase, releaseOutput);
+        begReleaseBtn.disabled = true;
     });
 
+    // Initial load
     await loadTodayTasks();
-  });
 
-  await loadTodayTasks();
+    // Check for incomplete tasks penalty every minute (for 2 AM trigger)
+    setInterval(() => {
+        if (window.applyPenaltiesForIncompleteTasks) window.applyPenaltiesForIncompleteTasks();
+    }, 60000);
 }
