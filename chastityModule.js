@@ -10,7 +10,6 @@ export async function loadChastityModule(supabase) {
 
   const statusP = document.getElementById("chastityStatus");
 
-  // Fetch and display the latest chastity status
   async function getChastityStatus() {
     if (!window.currentUser) return;
     const { data } = await supabase
@@ -36,10 +35,8 @@ export async function loadChastityModule(supabase) {
     }
   }
 
-  // Reduce lock time from task completion
-  window.reduceTimeForTask = async function(minutes) {
+  async function reduceTimeForTask(minutes) {
     if (!window.currentUser) return;
-
     const { data } = await supabase
       .from("chastityStatus")
       .select("*")
@@ -52,19 +49,16 @@ export async function loadChastityModule(supabase) {
     if (!latest.is_locked) return;
 
     const newRelease = new Date(new Date(latest.release_date).getTime() - minutes * 60 * 1000);
-
     await supabase
       .from("chastityStatus")
       .update({ release_date: newRelease.toISOString(), updated_at: new Date().toISOString() })
       .eq("id", latest.id);
 
     getChastityStatus();
-  };
+  }
 
-  // Attempt to beg for release
-  window.attemptBegRelease = async function(outputElement) {
+  async function attemptBegRelease(releaseOutputEl = null) {
     if (!window.currentUser) return;
-
     const { data } = await supabase
       .from("chastityStatus")
       .select("*")
@@ -73,15 +67,14 @@ export async function loadChastityModule(supabase) {
       .limit(1);
 
     if (!data || data.length === 0) {
-      if (outputElement) outputElement.innerText = "No chastity status found.";
+      if (releaseOutputEl) releaseOutputEl.innerText = "No chastity status found.";
       return alert("No chastity status found.");
     }
 
     const latest = data[0];
     const roll = Math.random();
-
     if (roll < 0.1) {
-      // SUCCESS: unlock immediately
+      // SUCCESS: unlock
       await supabase
         .from("chastityStatus")
         .update({
@@ -92,10 +85,11 @@ export async function loadChastityModule(supabase) {
         })
         .eq("id", latest.id);
 
-      if (outputElement) outputElement.innerText = "Mercy granted... Goddess KAREENA releases you.";
-      alert("Mercy granted... Goddess KAREENA releases you.");
+      const message = "Mercy granted... Goddess KAREENA releases you.";
+      if (releaseOutputEl) releaseOutputEl.innerText = message;
+      alert(message);
     } else {
-      // FAILURE: add 24 hours
+      // FAILURE: +24 hours
       const newRelease = new Date(latest.release_date);
       newRelease.setHours(newRelease.getHours() + 24);
 
@@ -108,14 +102,19 @@ export async function loadChastityModule(supabase) {
         })
         .eq("id", latest.id);
 
-      if (outputElement) outputElement.innerText = "Your begging displeased Goddess KAREENA. +24 hours added.";
-      alert("Your begging displeased Goddess KAREENA. +24 hours added.");
+      const message = "Your begging displeased Goddess KAREENA. +24 hours added.";
+      if (releaseOutputEl) releaseOutputEl.innerText = message;
+      alert(message);
     }
 
     getChastityStatus();
-  };
+  }
 
-  // Initial load and periodic refresh
+  window.reduceTimeForTask = reduceTimeForTask;
+  window.attemptBegRelease = attemptBegRelease;
+
   await getChastityStatus();
-  setInterval(getChastityStatus, 60000); // Refresh every 60s
+  setInterval(getChastityStatus, 60000);
+
+  return { reduceTimeForTask, attemptBegRelease };
 }
