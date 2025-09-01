@@ -1,121 +1,174 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>KAREENAISM Task Spinner</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<style>
-body { font-family: Arial, sans-serif; padding: 20px; }
-button { margin: 5px; }
-.task { margin: 5px 0; }
-.done { text-decoration: line-through; color: gray; }
-</style>
+  <meta charset="UTF-8">
+  <title>KAREENAISM Task Spinner</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #eee;
+      text-align: center;
+      padding: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 5px;
+      background: #e91e63;
+      color: #fff;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
 <body>
-<h1>Praise Goddess KAREENA!</h1>
+  <h1>Praise Goddess KAREENA</h1>
+  <p id="taskDisplay">Click below to receive your holy commandment.</p>
+  <button id="getTaskBtn" disabled>Get Task</button>
+  <p id="completionStatus"></p>
 
-<!-- Login -->
-<form id="loginForm" onsubmit="return false;">
-<input type="email" id="email" placeholder="Email" autocomplete="username">
-<input type="password" id="password" placeholder="Password" autocomplete="current-password">
-<button id="login">Login</button>
-</form>
-<button id="logout" style="display:none;">Logout</button>
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-<hr>
+    const supabaseUrl = "https://YOUR_PROJECT.supabase.co";
+    const supabaseKey = "YOUR_ANON_KEY";
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-<!-- Modules Container -->
-<div id="modulesContainer">Loading Modules from Goddess KAREENA's will...</div>
+    const getTaskBtn = document.getElementById("getTaskBtn");
+    const taskDisplay = document.getElementById("taskDisplay");
+    const completionStatus = document.getElementById("completionStatus");
 
-<hr>
+    let currentUser = null;
+    let tasksCompleted = 0;
 
-<!-- Beg Release -->
-<button id="begRelease" disabled>Beg for Release</button>
-<p id="releaseOutput"></p>
+    async function fetchChastityStatus(userId) {
+      console.log("Fetching chastity status for:", userId);
+      const { data, error } = await supabase
+        .from("chastityStatus")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
 
-<script type="module">
-const supabase = window.supabase.createClient(
-  "https://djdhtdrseqfaiskvbvhb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew"
-);
+      if (error) {
+        console.error("Chastity status fetch error:", error);
+      } else {
+        console.log("Fetched chastity status:", data);
+      }
+      return { data, error };
+    }
 
-const emailInput = document.getElementById("email");
-const passwordInput = document.getElementById("password");
-const loginBtn = document.getElementById("login");
-const logoutBtn = document.getElementById("logout");
-const begReleaseBtn = document.getElementById("begRelease");
-const releaseOutput = document.getElementById("releaseOutput");
+    async function updateChastityStatus(userId, adjustment) {
+      console.log("Updating chastity status by:", adjustment, "minutes");
 
-let currentUser = null;
-window.currentUser = null;
+      // Fetch existing status
+      const { data: existing, error: fetchError } = await supabase
+        .from("chastityStatus")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
 
-// Update beg button according to tasks completed
-function updateBegRelease(completedTasks) {
-  begReleaseBtn.disabled = completedTasks < 5;
-}
+      if (fetchError) {
+        console.error("Error fetching for update:", fetchError);
+        return;
+      }
+      console.log("Existing status before update:", existing);
 
-// Login handler
-loginBtn.addEventListener("click", async () => {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: emailInput.value,
-    password: passwordInput.value
-  });
-  if (error) return alert(error.message);
+      let releaseDate = existing?.release_date ? new Date(existing.release_date) : new Date();
+      releaseDate.setMinutes(releaseDate.getMinutes() + adjustment);
 
-  currentUser = data.user;
-  window.currentUser = currentUser;
+      const { error: updateError } = await supabase
+        .from("chastityStatus")
+        .update({
+          release_date: releaseDate.toISOString(),
+          is_locked: true
+        })
+        .eq("user_id", userId);
 
-  loginBtn.style.display = "none";
-  logoutBtn.style.display = "inline-block";
+      if (updateError) {
+        console.error("Error updating chastity status:", updateError);
+      } else {
+        console.log("Chastity status updated successfully. New release date:", releaseDate);
+      }
+    }
 
-  // Load modules dynamically
-  const { loadHolyDayStatusModule } = await import('./holyDayStatusModule.js');
-  loadHolyDayStatusModule(supabase);
+    async function fetchTask() {
+      const { data, error } = await supabase
+        .from("TaskLists")
+        .select("*")
+        .limit(1)
+        .order("RANDOM()");
 
-  const { loadTasksModule } = await import('./tasksModule.js');
-  loadTasksModule(supabase, updateBegRelease);
+      if (error) {
+        console.error("Error fetching task:", error);
+        return null;
+      }
+      console.log("Fetched task:", data[0]);
+      return data[0];
+    }
 
-  const { loadChastityModule, attemptBegRelease, reduceTimeForTask } = await import('./chastityModule.js');
-  await loadChastityModule(supabase);
+    async function markTaskCompleted(userId, taskId) {
+      console.log("Marking task completed:", taskId, "by user:", userId);
+      const { error } = await supabase
+        .from("rolled_tasks")
+        .insert([{ user_id: userId, task_id: taskId, completed: true }]);
 
-  // Make globals available
-  window.reduceTimeForTask = reduceTimeForTask;
-  window.attemptBegRelease = attemptBegRelease;
-});
+      if (error) {
+        console.error("Error marking task completed:", error);
+      } else {
+        console.log("Task marked completed successfully");
+      }
+    }
 
-// Logout handler
-logoutBtn.addEventListener("click", async () => {
-  await supabase.auth.signOut();
-  currentUser = null;
-  window.currentUser = null;
+    getTaskBtn.addEventListener("click", async () => {
+      const task = await fetchTask();
+      if (!task) return;
 
-  loginBtn.style.display = "inline-block";
-  logoutBtn.style.display = "none";
+      taskDisplay.textContent = task.task;
+      await markTaskCompleted(currentUser.id, task.id);
 
-  document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
-  releaseOutput.innerText = "";
-  begReleaseBtn.disabled = true;
-});
+      tasksCompleted++;
+      completionStatus.textContent = `${tasksCompleted} tasks completed`;
 
-// Beg button handler
-begReleaseBtn.addEventListener("click", async () => {
-  if (!window.currentUser || !window.attemptBegRelease) return;
+      // Chastity adjustment logic
+      if (currentUser) {
+        const adjustment = task.difficulty === "hard" ? 30 : -10; 
+        await updateChastityStatus(currentUser.id, adjustment);
+      }
 
-  begReleaseBtn.disabled = true; // prevent double-click
-  await window.attemptBegRelease(supabase, releaseOutput);
+      if (tasksCompleted >= 5) {
+        getTaskBtn.disabled = false;
+      }
+    });
 
-  // Re-enable button only if 5+ tasks completed
-  const { data: rolled } = await supabase
-    .from("rolled_tasks")
-    .select("*")
-    .eq("user_id", window.currentUser.id)
-    .eq("done", true);
+    async function init() {
+      console.log("Initializing…");
+      const { data: { user } } = await supabase.auth.getUser();
+      currentUser = user;
+      console.log("Current user:", currentUser);
 
-  const completedCount = rolled?.length || 0;
-  if (completedCount >= 5) {
-    begReleaseBtn.disabled = false;
-  }
-});
-</script>
+      if (!currentUser) {
+        taskDisplay.textContent = "Please sign in.";
+        return;
+      }
+
+      const { data, error } = await fetchChastityStatus(currentUser.id);
+      if (error || !data) {
+        taskDisplay.textContent = "No chastity status found.";
+        return;
+      }
+
+      taskDisplay.textContent = "Chastity status loaded. Begin tasks.";
+      getTaskBtn.disabled = false;
+    }
+
+    init();
+  </script>
 </body>
 </html>
