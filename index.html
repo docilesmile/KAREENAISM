@@ -51,7 +51,7 @@
     import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
     const supabaseUrl = "https://djdhtdrseqfaiskvbvhb.supabase.co";
-    const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRqZGh0ZHJzZXFmYWlza3ZidmhiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYyODEyNDMsImV4cCI6MjA3MTg1NzI0M30.sLHzX-UMZfjp5cWn0ii3nDUI9jmxGt5SigOI7jEg_ew";
+    const supabaseKey = "YOUR_SUPABASE_KEY";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const emailInput = document.getElementById("email");
@@ -81,7 +81,7 @@
       loadHolyDayStatusModule(supabase);
 
       const { loadTasksModule } = await import('./tasksModule.js');
-      loadTasksModule(supabase); // beg-for-release now handled inside tasksModule
+      loadTasksModule(supabase);
 
       const { loadChastityModule } = await import('./chastityModule.js');
       await loadChastityModule(supabase);
@@ -96,7 +96,8 @@
       loginBtn.style.display = "inline-block";
       logoutBtn.style.display = "none";
 
-      document.getElementById("modulesContainer").innerHTML = "Loading Modules from Goddess KAREENA's will...";
+      document.getElementById("modulesContainer").innerHTML =
+        "Loading Modules from Goddess KAREENA's will...";
     });
   </script>
 </body>
