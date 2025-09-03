@@ -117,7 +117,7 @@ async function applyPenaltiesForIncompleteTasks(supabase) {
   let totalPenaltyMinutes = 0;
   for (const task of incompleteTasks) {
     const rule = rules.find(r => r.difficulty === task.difficulty);
-    if (rule) totalPenaltyMinutes += (rule.penalty || 0) * 24 * 60;
+    if (rule) totalPenaltyMinutes += (rule.penalty || 0) * 60;
   }
 
   const newRelease = new Date(releaseDate.getTime() + totalPenaltyMinutes * 60000);
@@ -270,6 +270,7 @@ export async function loadChastityModule(supabase) {
 
   setInterval(() => getChastityStatus(supabase, statusP), 60000);
 
+  // Daily random lockup check at 4am
   setInterval(async () => {
     const now = new Date();
     if (now.getHours() === 4 && now.getMinutes() === 0) {
@@ -279,4 +280,11 @@ export async function loadChastityModule(supabase) {
 }
 
 // ------------------------
-export { reduceTimeForTask, attemptBegRelease, applyPenaltiesFor
+// Final exports
+export { 
+  reduceTimeForTask, 
+  attemptBegRelease, 
+  applyPenaltiesForIncompleteTasks, 
+  applyRandomLockup, 
+  loadChastityModule 
+};
