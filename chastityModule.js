@@ -4,7 +4,6 @@
 // Helper: Parse Supabase timestamp safely
 function parseTimestamp(ts) {
   if (!ts) return null;
-  // Supabase returns "+00" sometimes, convert to proper UTC
   return new Date(ts.toString().replace("+00", "Z"));
 }
 
@@ -118,7 +117,7 @@ async function applyPenaltiesForIncompleteTasks(supabase) {
   let totalPenaltyMinutes = 0;
   for (const task of incompleteTasks) {
     const rule = rules.find(r => r.difficulty === task.difficulty);
-    if (rule) totalPenaltyMinutes += (rule.penalty || 0) * 24 * 60; // convert days to minutes
+    if (rule) totalPenaltyMinutes += (rule.penalty || 0) * 24 * 60;
   }
 
   const newRelease = new Date(releaseDate.getTime() + totalPenaltyMinutes * 60000);
@@ -157,7 +156,6 @@ async function attemptBegRelease(supabase, outputElement) {
     return;
   }
 
-  // Locked: 10% chance of mercy, 90% chance to add 24h
   const roll = Math.random();
   if (roll < 0.1) {
     await supabase
@@ -190,11 +188,11 @@ async function attemptBegRelease(supabase, outputElement) {
 
 // ------------------------
 // Random lockup (Option B: sparing extension)
-export async function applyRandomLockup(supabase) {
+async function applyRandomLockup(supabase) {
   if (!window.currentUser) return;
 
   try {
-    const chance = 0.2; // 20% daily chance
+    const chance = 0.2;
     if (Math.random() > chance) return;
 
     const { data, error } = await supabase
@@ -209,7 +207,6 @@ export async function applyRandomLockup(supabase) {
     const latest = data[0];
     let releaseDate = parseTimestamp(latest.release_date) || new Date();
 
-    // Pick a random penalty from punishment table
     const { data: punishments } = await supabase.from("punishments").select("*");
     if (!punishments || punishments.length === 0) return;
 
@@ -230,24 +227,21 @@ export async function applyRandomLockup(supabase) {
       });
 
       console.log(`🔒 Goddess locked you randomly for ${penaltyDays} days (${selected.difficulty})!`);
+    } else if (Math.random() < 0.1) {
+      releaseDate.setDate(releaseDate.getDate() + penaltyDays);
+
+      await supabase
+        .from("chastityStatus")
+        .update({
+          release_date: releaseDate.toISOString(),
+          source: "random_lockup_extend",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", latest.id);
+
+      console.log(`⚠️ Goddess extended your lockup by ${penaltyDays} days (${selected.difficulty})!`);
     } else {
-      // Already locked: 10% chance to extend
-      if (Math.random() < 0.1) {
-        releaseDate.setDate(releaseDate.getDate() + penaltyDays);
-
-        await supabase
-          .from("chastityStatus")
-          .update({
-            release_date: releaseDate.toISOString(),
-            source: "random_lockup_extend",
-            updated_at: new Date().toISOString()
-          })
-          .eq("id", latest.id);
-
-        console.log(`⚠️ Goddess extended your lockup by ${penaltyDays} days (${selected.difficulty})!`);
-      } else {
-        console.log("Goddess chose not to extend your lockup this time.");
-      }
+      console.log("Goddess chose not to extend your lockup this time.");
     }
   } catch (err) {
     console.error("Random lockup error:", err);
@@ -267,19 +261,15 @@ export async function loadChastityModule(supabase) {
 
   const statusP = document.getElementById("chastityStatus");
 
-  // Assign globals for Index
   window.reduceTimeForTask = async (minutes) => reduceTimeForTask(supabase, minutes);
   window.attemptBegRelease = async (outputEl) => attemptBegRelease(supabase, outputEl);
   window.applyPenaltiesForIncompleteTasks = async () => applyPenaltiesForIncompleteTasks(supabase);
   window.applyRandomLockup = async () => applyRandomLockup(supabase);
 
-  // Initial load
   await getChastityStatus(supabase, statusP);
 
-  // Refresh every minute
   setInterval(() => getChastityStatus(supabase, statusP), 60000);
 
-  // Daily 4am trigger
   setInterval(async () => {
     const now = new Date();
     if (now.getHours() === 4 && now.getMinutes() === 0) {
@@ -288,4 +278,5 @@ export async function loadChastityModule(supabase) {
   }, 60000);
 }
 
-export { reduceTimeForTask, attemptBegRelease, applyPenaltiesForIncompleteTasks, applyRandomLockup };
+// ------------------------
+export { reduceTimeForTask, attemptBegRelease, applyPenaltiesFor
