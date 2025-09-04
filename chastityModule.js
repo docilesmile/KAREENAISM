@@ -10,14 +10,13 @@ function parseTimestamp(ts) {
 // ------------------------
 // Get the latest chastity status for the current user
 async function getChastityStatus(supabase, statusElement) {
-  if (!window.currentUser) {
-    if (statusElement) statusElement.innerText = "Please log in to see your chastity status.";
-    return null;
-  }
+  if (!window.currentUser) return null;
 
   try {
+    console.log("Fetching chastityStatus for user_id:", window.currentUser.id);
+
     const { data, error } = await supabase
-      .from("chastityStatus")  // ✅ Correct table name
+      .from("chastityStatus")
       .select("*")
       .eq("user_id", window.currentUser.id)
       .order("created_at", { ascending: false })
@@ -28,6 +27,8 @@ async function getChastityStatus(supabase, statusElement) {
       if (statusElement) statusElement.innerText = "Error fetching chastity status.";
       return null;
     }
+
+    console.log("Chastity data returned:", data);
 
     const latest = data?.[0];
     if (!latest) {
@@ -47,7 +48,7 @@ async function getChastityStatus(supabase, statusElement) {
     return latest;
 
   } catch (err) {
-    console.error("Error in getChastityStatus:", err);
+    console.error("Error in getChastityStatus catch:", err);
     if (statusElement) statusElement.innerText = "Error fetching chastity status.";
     return null;
   }
@@ -56,8 +57,18 @@ async function getChastityStatus(supabase, statusElement) {
 // ------------------------
 // Reduce chastity time for completing tasks
 async function reduceTimeForTask(supabase, minutes) {
-  const latest = await getChastityStatus(supabase, null);
-  if (!latest || !latest.is_locked || !latest.release_date) return;
+  if (!window.currentUser) return;
+
+  const { data, error } = await supabase
+    .from("chastityStatus")
+    .select("*")
+    .eq("user_id", window.currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (error || !data || data.length === 0) return;
+  const latest = data[0];
+  if (!latest.is_locked || !latest.release_date) return;
 
   const releaseDate = parseTimestamp(latest.release_date);
   const newRelease = new Date(releaseDate.getTime() - minutes * 60000);
@@ -73,8 +84,7 @@ async function reduceTimeForTask(supabase, minutes) {
 // ------------------------
 // Apply penalties for incomplete tasks
 async function applyPenaltiesForIncompleteTasks(supabase) {
-  const latest = await getChastityStatus(supabase, null);
-  if (!latest || !latest.is_locked || !latest.release_date) return;
+  if (!window.currentUser) return;
 
   const today = new Date().toISOString().split("T")[0];
 
@@ -95,13 +105,25 @@ async function applyPenaltiesForIncompleteTasks(supabase) {
   const { data: rules } = await supabase.from("punishments").select("*");
   if (!rules) return;
 
+  const { data: statusData } = await supabase
+    .from("chastityStatus")
+    .select("*")
+    .eq("user_id", window.currentUser.id)
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (!statusData || statusData.length === 0) return;
+  const latest = statusData[0];
+  if (!latest.is_locked || !latest.release_date) return;
+
+  const releaseDate = parseTimestamp(latest.release_date);
+
   let totalPenaltyMinutes = 0;
   for (const task of incompleteTasks) {
     const rule = rules.find(r => r.difficulty === task.difficulty);
     if (rule) totalPenaltyMinutes += (rule.penalty || 0) * 60;
   }
 
-  const releaseDate = parseTimestamp(latest.release_date);
   const newRelease = new Date(releaseDate.getTime() + totalPenaltyMinutes * 60000);
 
   await supabase
@@ -115,6 +137,8 @@ async function applyPenaltiesForIncompleteTasks(supabase) {
 // ------------------------
 // Beg for release button
 async function attemptBegRelease(supabase, outputElement) {
+  if (!window.currentUser) return;
+
   const latest = await getChastityStatus(supabase, outputElement);
   if (!latest) {
     if (outputElement) outputElement.innerText = "No chastity status found.";
@@ -167,50 +191,64 @@ async function attemptBegRelease(supabase, outputElement) {
 }
 
 // ------------------------
-// Random lockup
+// Random lockup (Option B: sparing extension)
 async function applyRandomLockup(supabase) {
-  const latest = await getChastityStatus(supabase, null);
-  if (!latest) return;
+  if (!window.currentUser) return;
 
-  const chance = 0.2;
-  if (Math.random() > chance) return;
+  try {
+    const chance = 0.2;
+    if (Math.random() > chance) return;
 
-  const { data: punishments } = await supabase.from("punishments").select("*");
-  if (!punishments || punishments.length === 0) return;
-
-  const selected = punishments[Math.floor(Math.random() * punishments.length)];
-  const penaltyDays = selected.penalty || 1;
-
-  let releaseDate = parseTimestamp(latest.release_date) || new Date();
-
-  if (!latest.is_locked) {
-    releaseDate.setDate(releaseDate.getDate() + penaltyDays);
-
-    await supabase.from("chastityStatus").insert({
-      user_id: window.currentUser.id,
-      release_date: releaseDate.toISOString(),
-      is_locked: true,
-      source: "random_lockup",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    });
-
-    console.log(`🔒 Goddess locked you randomly for ${penaltyDays} days (${selected.difficulty})!`);
-  } else if (Math.random() < 0.1) {
-    releaseDate.setDate(releaseDate.getDate() + penaltyDays);
-
-    await supabase
+    const { data, error } = await supabase
       .from("chastityStatus")
-      .update({
-        release_date: releaseDate.toISOString(),
-        source: "random_lockup_extend",
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", latest.id);
+      .select("*")
+      .eq("user_id", window.currentUser.id)
+      .order("created_at", { ascending: false })
+      .limit(1);
 
-    console.log(`⚠️ Goddess extended your lockup by ${penaltyDays} days (${selected.difficulty})!`);
-  } else {
-    console.log("Goddess chose not to extend your lockup this time.");
+    if (error || !data || data.length === 0) return;
+
+    const latest = data[0];
+    let releaseDate = parseTimestamp(latest.release_date) || new Date();
+
+    const { data: punishments } = await supabase.from("punishments").select("*");
+    if (!punishments || punishments.length === 0) return;
+
+    const selected = punishments[Math.floor(Math.random() * punishments.length)];
+    const penaltyDays = selected.penalty || 1;
+
+    if (!latest.is_locked) {
+      releaseDate = new Date();
+      releaseDate.setDate(releaseDate.getDate() + penaltyDays);
+
+      await supabase.from("chastityStatus").insert({
+        user_id: window.currentUser.id,
+        release_date: releaseDate.toISOString(),
+        is_locked: true,
+        source: "random_lockup",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+
+      console.log(`🔒 Goddess locked you randomly for ${penaltyDays} days (${selected.difficulty})!`);
+    } else if (Math.random() < 0.1) {
+      releaseDate.setDate(releaseDate.getDate() + penaltyDays);
+
+      await supabase
+        .from("chastityStatus")
+        .update({
+          release_date: releaseDate.toISOString(),
+          source: "random_lockup_extend",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", latest.id);
+
+      console.log(`⚠️ Goddess extended your lockup by ${penaltyDays} days (${selected.difficulty})!`);
+    } else {
+      console.log("Goddess chose not to extend your lockup this time.");
+    }
+  } catch (err) {
+    console.error("Random lockup error:", err);
   }
 }
 
@@ -244,3 +282,13 @@ export async function loadChastityModule(supabase) {
     }
   }, 60000);
 }
+
+// ------------------------
+// Final exports
+export { 
+  reduceTimeForTask, 
+  attemptBegRelease, 
+  applyPenaltiesForIncompleteTasks, 
+  applyRandomLockup, 
+  loadChastityModule 
+};
