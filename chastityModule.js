@@ -13,8 +13,6 @@ async function getChastityStatus(supabase, statusElement) {
   if (!window.currentUser) return null;
 
   try {
-    console.log("Fetching chastityStatus for user_id:", window.currentUser.id);
-
     const { data, error } = await supabase
       .from("chastityStatus")
       .select("*")
@@ -23,12 +21,10 @@ async function getChastityStatus(supabase, statusElement) {
       .limit(1);
 
     if (error) {
-      console.error("Error loading chastity status:", error);
+      console.error("Chastity status fetch error:", error);
       if (statusElement) statusElement.innerText = "Error fetching chastity status.";
       return null;
     }
-
-    console.log("Chastity data returned:", data);
 
     const latest = data?.[0];
     if (!latest) {
@@ -48,7 +44,7 @@ async function getChastityStatus(supabase, statusElement) {
     return latest;
 
   } catch (err) {
-    console.error("Error in getChastityStatus catch:", err);
+    console.error("Error in getChastityStatus:", err);
     if (statusElement) statusElement.innerText = "Error fetching chastity status.";
     return null;
   }
@@ -254,7 +250,7 @@ async function applyRandomLockup(supabase) {
 
 // ------------------------
 // Load module into Index
-export async function loadChastityModule(supabase) {
+async function loadChastityModule(supabase) {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
 
@@ -289,5 +285,6 @@ export {
   reduceTimeForTask, 
   attemptBegRelease, 
   applyPenaltiesForIncompleteTasks, 
-  applyRandomLockup
+  applyRandomLockup, 
+  loadChastityModule 
 };
