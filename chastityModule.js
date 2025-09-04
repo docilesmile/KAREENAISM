@@ -285,6 +285,5 @@ export {
   reduceTimeForTask, 
   attemptBegRelease, 
   applyPenaltiesForIncompleteTasks, 
-  applyRandomLockup, 
-  loadChastityModule 
+  applyRandomLockup
 };
