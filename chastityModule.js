@@ -250,7 +250,7 @@ async function applyRandomLockup(supabase) {
 
 // ------------------------
 // Load module into Index
-export async function loadChastityModule(supabase) {
+async function loadChastityModule(supabase) {
   const modulesContainer = document.getElementById("modulesContainer");
   if (!modulesContainer) return;
 
