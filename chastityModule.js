@@ -14,14 +14,14 @@ async function getChastityStatus(supabase, statusElement) {
 
   try {
     const { data, error } = await supabase
-      .from("public.chastityStatus")
+      .from("chastityStatus") // ✅ Correct table name
       .select("*")
       .eq("user_id", window.currentUser.id)
       .order("created_at", { ascending: false })
       .limit(1);
 
     if (error) {
-      console.error("Error loading chastity status:", error);
+      console.error("Chastity status fetch error:", error);
       if (statusElement) statusElement.innerText = "Error fetching chastity status.";
       return null;
     }
@@ -56,7 +56,7 @@ async function reduceTimeForTask(supabase, minutes) {
   if (!window.currentUser) return;
 
   const { data, error } = await supabase
-    .from("public.chastityStatus")
+    .from("chastityStatus") // ✅ Correct table name
     .select("*")
     .eq("user_id", window.currentUser.id)
     .order("created_at", { ascending: false })
@@ -70,7 +70,7 @@ async function reduceTimeForTask(supabase, minutes) {
   const newRelease = new Date(releaseDate.getTime() - minutes * 60000);
 
   await supabase
-    .from("public.chastityStatus")
+    .from("chastityStatus") // ✅ Correct table name
     .update({ release_date: newRelease.toISOString(), updated_at: new Date().toISOString() })
     .eq("id", latest.id);
 
@@ -102,7 +102,7 @@ async function applyPenaltiesForIncompleteTasks(supabase) {
   if (!rules) return;
 
   const { data: statusData } = await supabase
-    .from("public.chastityStatus")
+    .from("chastityStatus") // ✅ Correct table name
     .select("*")
     .eq("user_id", window.currentUser.id)
     .order("created_at", { ascending: false })
@@ -123,7 +123,7 @@ async function applyPenaltiesForIncompleteTasks(supabase) {
   const newRelease = new Date(releaseDate.getTime() + totalPenaltyMinutes * 60000);
 
   await supabase
-    .from("public.chastityStatus")
+    .from("chastityStatus") // ✅ Correct table name
     .update({ release_date: newRelease.toISOString(), updated_at: new Date().toISOString() })
     .eq("id", latest.id);
 
@@ -159,7 +159,7 @@ async function attemptBegRelease(supabase, outputElement) {
   const roll = Math.random();
   if (roll < 0.1) {
     await supabase
-      .from("public.chastityStatus")
+      .from("chastityStatus") // ✅ Correct table name
       .update({
         is_locked: false,
         release_date: new Date().toISOString(),
@@ -173,7 +173,7 @@ async function attemptBegRelease(supabase, outputElement) {
   } else {
     const newRelease = new Date(releaseDate.getTime() + 24 * 60 * 60000);
     await supabase
-      .from("public.chastityStatus")
+      .from("chastityStatus") // ✅ Correct table name
       .update({
         release_date: newRelease.toISOString(),
         source: "beg_failure",
@@ -196,7 +196,7 @@ async function applyRandomLockup(supabase) {
     if (Math.random() > chance) return;
 
     const { data, error } = await supabase
-      .from("public.chastityStatus")
+      .from("chastityStatus") // ✅ Correct table name
       .select("*")
       .eq("user_id", window.currentUser.id)
       .order("created_at", { ascending: false })
@@ -217,7 +217,7 @@ async function applyRandomLockup(supabase) {
       releaseDate = new Date();
       releaseDate.setDate(releaseDate.getDate() + penaltyDays);
 
-      await supabase.from("public.chastityStatus").insert({
+      await supabase.from("chastityStatus").insert({
         user_id: window.currentUser.id,
         release_date: releaseDate.toISOString(),
         is_locked: true,
@@ -231,7 +231,7 @@ async function applyRandomLockup(supabase) {
       releaseDate.setDate(releaseDate.getDate() + penaltyDays);
 
       await supabase
-        .from("public.chastityStatus")
+        .from("chastityStatus") // ✅ Correct table name
         .update({
           release_date: releaseDate.toISOString(),
           source: "random_lockup_extend",
